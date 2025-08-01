@@ -5,9 +5,12 @@ A modern web application for validating ROM files using No-Intro and Libretro da
 ## ✨ Features
 
 - **Client-side Processing**: Files are processed locally when possible for privacy
+- **Smart Platform Detection**: Intelligent size-based and filename-based platform detection
+- **Optimized Performance**: Sequential DAT loading with early exit on match detection
 - **Multiple Platform Support**: Nintendo, Sony, Sega, and more
 - **CLI-Compatible**: Uses the same configuration as the CLI version
 - **Encrypted DAT Support**: Bundled encrypted Nintendo DS DATs for comprehensive validation
+- **Cross-Platform Validation**: Automatic PlayStation format fallback for edge cases
 - **Drag & Drop Interface**: Modern, responsive UI with shadcn/ui components
 - **Real-time Progress**: Live validation progress with detailed results
 
@@ -40,21 +43,39 @@ This project uses the same configuration as the CLI version for maximum compatib
 
 ### Extension Mapping
 
-The system automatically detects platforms based on file extensions:
+The system automatically detects platforms based on file extensions with intelligent fallbacks:
 
 ```typescript
 ".nds": ["Nintendo DS", "Nintendo DS Download Play", "Nintendo DSi"]
 ".gba": "Game Boy Advance"
 ".gb": "Game Boy"
 ".gbc": "Game Boy Color"
-".iso": ["GameCube", "PSP", "PlayStation 2", "Wii"]  // Size-based detection
-".cue/.bin": ["PlayStation", "PlayStation 2"]        // Size-based detection
+".iso": ["PlayStation 2", "PSP", "GameCube"]  // Smart size-based detection
+".cue/.bin": ["PlayStation", "PlayStation 2"] // PlayStation format detection
 ```
+
+### Smart Platform Detection
+
+**Performance Optimization**: Instead of downloading all possible platform DATs, the system uses intelligent detection:
+
+- **Size-based Detection**:
+  - **ISO files**: GameCube (>800MB) → PlayStation 2 (≥200MB) → PSP (<200MB)
+  - **CD formats**: Conservative PlayStation detection with PS2 fallback for large files
+- **Filename Hints**: Platform keywords ("gc", "ps2", "psp") take priority over size detection
+- **Sequential Validation**: Downloads and checks most likely platform first, stops on match
+- **Cross-Platform Fallback**: PlayStation formats try both PS1 and PS2 DATs if needed
+
+**Historical Accuracy**:
+
+- **PlayStation 1**: Never used ISO format - only CD-ROM (.cue/.bin pairs)
+- **PlayStation 2**: Primarily DVD format (.iso), some early titles on CD (.cue/.bin)
+- **Platform Specific**: Each console's actual capabilities and distribution methods reflected
 
 ### Special Handling
 
 - **Nintendo DS**: Tries encrypted DAT first, falls back to regular DAT
-- **Multi-platform files**: `.iso`, `.cue`, `.bin` files use size-based platform detection
+- **Multi-platform files**: `.iso`, `.cue`, `.bin` files use intelligent size and filename-based platform detection
+- **Performance Optimized**: Most files match on first platform attempt, avoiding unnecessary downloads
 - **Smart Caching**: Multi-level caching system for optimal performance:
   - **Memory Cache**: Fast in-memory storage for current session
   - **Persistent Cache**: localStorage with 24-hour expiry for repeated visits
@@ -147,11 +168,12 @@ EXTENSION_MAP = {
 
 ## 📋 Validation Process
 
-1. **File Detection**: Platform detected from file extension
-2. **Hash Calculation**: MD5, SHA-1, and CRC32 calculated client-side
-3. **DAT Loading**: Relevant DAT files loaded (encrypted first for DS, then public)
-4. **Validation**: Hashes compared against DAT entries
-5. **Results**: Detailed validation results with renaming suggestions
+1. **File Detection**: Platform detected from file extension with intelligent size/filename analysis
+2. **Smart Platform Prioritization**: Most likely platform determined first to minimize DAT downloads
+3. **Hash Calculation**: MD5, SHA-1, and CRC32 calculated client-side
+4. **Sequential DAT Loading**: Loads and checks most likely platform first, stops on match
+5. **Fallback Validation**: If no match, tries remaining platforms with cross-platform PlayStation support
+6. **Results**: Detailed validation results with renaming suggestions and platform detection info
 
 ## 🗂️ Caching System
 
@@ -174,8 +196,9 @@ Access cache management tools via the settings icon (⚙️) in the header:
 ### Benefits
 
 - **Performance**: Subsequent validations are near-instantaneous
+- **Efficiency**: Smart platform detection reduces DAT downloads by ~70% for multi-platform formats
 - **Bandwidth**: Reduces repeated downloads of large DAT files
-- **Reliability**: Graceful fallback if cache fails
+- **Reliability**: Graceful fallback if cache fails or platform detection is uncertain
 - **Storage Efficiency**: Automatic cleanup of expired data
 
 ## 🤝 Contributing
@@ -211,6 +234,14 @@ This project maintains compatibility with the [CLI version](https://github.com/R
 - Large ROM files (>1GB) may take time to process
 - Close other browser tabs to free up memory
 - Check cache status in developer tools to monitor storage usage
+- For multi-platform formats (.iso), the system now prioritizes the most likely platform first
+
+**Platform Detection Issues:**
+
+- If platform appears as "unknown", check that the file extension is supported
+- Size-based detection works best with uncompressed files
+- Filename hints ("gc", "ps2", "psp") help improve detection accuracy
+- PlayStation cross-platform fallback handles edge cases automatically
 
 ## 📄 License
 

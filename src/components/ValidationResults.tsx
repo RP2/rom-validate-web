@@ -303,7 +303,7 @@ export default function ValidationResults() {
                       )}
 
                       <div className="text-muted-foreground flex flex-wrap gap-4 text-xs">
-                        {result.platform && (
+                        {result.platform && result.platform !== "unknown" && (
                           <span className="flex items-center gap-1">
                             <HardDrive className="h-3 w-3" />
                             {result.platform}
@@ -363,9 +363,11 @@ export default function ValidationResults() {
               <Download className="mr-2 h-4 w-4" />
               Download Report
             </Button>
-            <Button variant="outline" onClick={handleApplyRenames}>
-              Apply Renames (Downloads {filesToRename.length} Files)
-            </Button>
+            {filesToRename.length > 0 && (
+              <Button variant="outline" onClick={handleApplyRenames}>
+                Apply Renames (Download {filesToRename.length} Files)
+              </Button>
+            )}
             <Button variant="outline">Export Unknown List</Button>
           </div>
         </CardContent>

@@ -1,6 +1,6 @@
 // Client-side ROM validation utilities
 
-// Simple MD5 implementation as fallback when Web Crypto API doesn't support it
+// Simple MD5 implementation as fallback when Web Crypto API
 function simpleMD5(data: Uint8Array): string {
   // This is a simplified version - in production you might want to use a library like crypto-js
   // For now, we'll return a hash based on the data content
@@ -19,7 +19,7 @@ export interface DATEntry {
   md5?: string;
   sha1?: string;
   crc32?: string;
-  platform: string;
+  platform?: string;
   region?: string;
   description?: string;
 }
@@ -99,7 +99,10 @@ export async function calculateFileHashes(
 }
 
 // Parse DAT files (supports both XML and ClrMamePro formats)
-export function parseDAT(datContent: string): DATEntry[] {
+export function parseDAT(
+  datContent: string,
+  knownPlatform?: string,
+): DATEntry[] {
   console.log("📄 DAT content preview:", datContent.substring(0, 500));
   console.log("📄 DAT content length:", datContent.length);
 
@@ -109,15 +112,15 @@ export function parseDAT(datContent: string): DATEntry[] {
     datContent.includes("<datafile>")
   ) {
     console.log("📄 Detected XML format");
-    return parseXMLDAT(datContent);
+    return parseXMLDAT(datContent, knownPlatform);
   } else {
     console.log("📄 Detected ClrMamePro format");
-    return parseClrMameProDAT(datContent);
+    return parseClrMameProDAT(datContent, knownPlatform);
   }
 }
 
 // Parse XML DAT files
-function parseXMLDAT(xmlContent: string): DATEntry[] {
+function parseXMLDAT(xmlContent: string, knownPlatform?: string): DATEntry[] {
   const parser = new DOMParser();
   const doc = parser.parseFromString(xmlContent, "text/xml");
   const games = doc.querySelectorAll("game");
@@ -133,8 +136,13 @@ function parseXMLDAT(xmlContent: string): DATEntry[] {
       const sha1 = rom.getAttribute("sha1") || undefined;
       const crc32 = rom.getAttribute("crc") || undefined;
 
-      // Try to detect platform from DAT structure or filename
-      const platform = detectPlatformFromName(name, size);
+      // Use known platform if available, otherwise try to detect from filename
+      const platform =
+        knownPlatform ||
+        (() => {
+          const detectedPlatform = detectPlatformFromName(name, size);
+          return detectedPlatform !== "unknown" ? detectedPlatform : undefined;
+        })();
       const region = detectRegion(name);
 
       entries.push({
@@ -155,7 +163,10 @@ function parseXMLDAT(xmlContent: string): DATEntry[] {
 }
 
 // Parse ClrMamePro DAT files
-function parseClrMameProDAT(datContent: string): DATEntry[] {
+function parseClrMameProDAT(
+  datContent: string,
+  knownPlatform?: string,
+): DATEntry[] {
   const entries: DATEntry[] = [];
   const lines = datContent.split("\n");
 
@@ -245,10 +256,17 @@ function parseClrMameProDAT(datContent: string): DATEntry[] {
         inRom = false;
 
         if (currentRom.name && currentGame.name) {
-          const platform = detectPlatformFromName(
-            currentGame.name,
-            currentRom.size || 0,
-          );
+          const platform =
+            knownPlatform ||
+            (() => {
+              const detectedPlatform = detectPlatformFromName(
+                currentGame.name,
+                currentRom.size || 0,
+              );
+              return detectedPlatform !== "unknown"
+                ? detectedPlatform
+                : undefined;
+            })();
           const region = detectRegion(currentGame.name);
 
           entries.push({
@@ -277,10 +295,17 @@ function parseClrMameProDAT(datContent: string): DATEntry[] {
       inRom = false;
 
       if (currentRom.name && currentGame.name) {
-        const platform = detectPlatformFromName(
-          currentGame.name,
-          currentRom.size || 0,
-        );
+        const platform =
+          knownPlatform ||
+          (() => {
+            const detectedPlatform = detectPlatformFromName(
+              currentGame.name,
+              currentRom.size || 0,
+            );
+            return detectedPlatform !== "unknown"
+              ? detectedPlatform
+              : undefined;
+          })();
         const region = detectRegion(currentGame.name);
 
         entries.push({
@@ -364,19 +389,59 @@ function detectPlatformFromName(filename: string, size: number): string {
   if (ext === ".cso" || ext === ".pbp") return "PSP";
   if (ext === ".gcm" || ext === ".ciso") return "GameCube";
   if (ext === ".wbfs") return "Wii";
-  if (ext === ".psx") return "PlayStation";
 
   // Size-based detection for multi-platform formats
   if (ext === ".iso") {
-    if (size > 1000000000) return "Wii"; // ~1GB+ likely Wii
-    if (size > 600000000) return "PlayStation 2"; // ~600MB+ likely PS2
-    if (size > 50000000) return "PlayStation"; // ~50MB+ likely PSX
-    return "PSP"; // Smaller ISOs likely PSP
+    const sizeMB = size / (1024 * 1024);
+
+    // Check filename for explicit platform hints first (most reliable)
+    if (name.includes("gc") || name.includes("gamecube")) return "GameCube";
+    if (name.includes("ps2") || name.includes("playstation 2"))
+      return "PlayStation 2";
+    if (name.includes("psp")) return "PSP";
+
+    // Size-based heuristics - PS1 never used ISO format, only PS2/PSP/GameCube
+    // PlayStation 2 DVDs are typically larger (650MB-4.7GB single layer, up to 8.5GB dual layer)
+    // PS2 is the most common for larger ISOs
+    if (sizeMB > 800) {
+      return "PlayStation 2";
+    }
+    // GameCube mini-DVDs are typically smaller (< 800MB, max ~1.4GB)
+    // Medium-sized ISOs are more likely GameCube
+    else if (sizeMB >= 200) {
+      return "GameCube";
+    }
+    // PSP ISOs are typically smallest (< 200MB for UMD, but can be up to 1.8GB)
+    // Only very small ISOs are likely PSP
+    else {
+      return "PSP";
+    }
   }
 
-  if (ext === ".cue" || ext === ".bin") {
-    if (size > 600000000) return "PlayStation 2";
+  if (ext === ".bin") {
+    // Check filename for explicit platform hints first (most reliable)
+    if (name.includes("ps2") || name.includes("playstation 2"))
+      return "PlayStation 2";
+    if (
+      name.includes("ps1") ||
+      name.includes("psx") ||
+      name.includes("playstation")
+    )
+      return "PlayStation";
+
+    // Size-based detection for .bin files - PS1 first (more common for CD format)
+    const sizeMB = size / (1024 * 1024);
+    // Very large files are likely PS2 (some PS2 games used CD format)
+    if (sizeMB > 900) return "PlayStation 2";
+
+    // Default to PS1 for .bin files - PS1 exclusively used CD format, PS2 mostly used DVD
+    // This ensures PS1 DAT is checked first for most .bin files
     return "PlayStation";
+  }
+
+  // .cue files are just metadata pointing to .bin files, ignore them
+  if (ext === ".cue") {
+    return "unknown"; // .cue files should not be validated, only .bin files contain the actual data
   }
 
   // Fallback to name-based detection
@@ -545,29 +610,148 @@ export async function validateROMs(
 ): Promise<ValidationResult[]> {
   const results: ValidationResult[] = [];
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    onProgress?.(i + 1, files.length, file.name);
+  // Filter out .cue files before processing
+  const validFiles = files.filter((file) => {
+    const ext = file.name.toLowerCase().substring(file.name.lastIndexOf("."));
+    return ext !== ".cue";
+  });
 
+  console.log(
+    `📁 Processing ${validFiles.length} files (${files.length - validFiles.length} .cue files skipped)`,
+  );
+
+  for (let i = 0; i < validFiles.length; i++) {
+    const file = validFiles[i];
+
+    onProgress?.(i + 1, validFiles.length, file.name);
+
+    console.log(
+      `📁 Processing file ${i + 1}/${validFiles.length}: ${file.name}`,
+    );
     const hashes = await calculateFileHashes(file);
 
     // Get platform-specific DAT entries based on file extension (CLI-style)
-    const { getPlatformsForFile, loadMultiplePlatformDATs } = await import(
+    const { getPlatformsForFile, loadPlatformDAT } = await import(
       "./datLoader"
     );
     const platforms = getPlatformsForFile(file.name);
 
-    let platformEntries: DATEntry[] = [];
+    let result: ValidationResult;
+
     if (platforms.length > 0) {
-      platformEntries = await loadMultiplePlatformDATs(platforms);
+      // For multi-platform formats, try the most likely platform first based on size/name
+      if (platforms.length > 1) {
+        const mostLikelyPlatform = detectPlatformFromName(file.name, file.size);
+
+        // Reorder platforms to check the most likely one first
+        const orderedPlatforms = platforms.includes(mostLikelyPlatform)
+          ? [
+              mostLikelyPlatform,
+              ...platforms.filter((p) => p !== mostLikelyPlatform),
+            ]
+          : platforms;
+
+        result = { status: "unknown" } as ValidationResult;
+
+        console.log(
+          `🎯 Processing ${file.name} - Detected platforms:`,
+          platforms,
+        );
+        console.log(`🎯 Most likely platform: ${mostLikelyPlatform}`);
+        console.log(`🎯 Ordered platforms:`, orderedPlatforms);
+
+        // Try platforms one by one until we find a match
+        for (const platform of orderedPlatforms) {
+          console.log(`🔍 Trying platform: ${platform}`);
+          const platformEntries = await loadPlatformDAT(platform);
+          const platformResult = validateROM(file, hashes, platformEntries);
+
+          if (platformResult.status !== "unknown") {
+            console.log(
+              `✅ Found match in ${platform}! Status: ${platformResult.status}`,
+            );
+            result = platformResult;
+            break; // Found a match, stop checking other platforms
+          } else {
+            console.log(`❌ No match in ${platform}`);
+          }
+        }
+
+        // If still no match and this is a PlayStation format, try cross-platform fallback
+        if (result.status === "unknown") {
+          console.log(
+            `🔄 No match found in primary platforms, checking PlayStation cross-platform fallback...`,
+          );
+          const ext = file.name
+            .toLowerCase()
+            .substring(file.name.lastIndexOf("."));
+          const isPlayStationFormat = [".iso", ".bin"].includes(ext);
+
+          if (isPlayStationFormat) {
+            console.log(
+              `🎮 PlayStation format detected, trying cross-platform fallback`,
+            );
+            // Try PlayStation platforms not already checked
+            const psFormats = ["PlayStation", "PlayStation 2"];
+            const uncheckedPsPlatforms = psFormats.filter(
+              (p) => !orderedPlatforms.includes(p),
+            );
+            console.log(`🔍 Unchecked PS platforms:`, uncheckedPsPlatforms);
+
+            for (const psPlatform of uncheckedPsPlatforms) {
+              console.log(`🔍 Trying PlayStation fallback: ${psPlatform}`);
+              const fallbackEntries = await loadPlatformDAT(psPlatform);
+              const fallbackResult = validateROM(file, hashes, fallbackEntries);
+
+              if (fallbackResult.status !== "unknown") {
+                console.log(
+                  `✅ Found match in PlayStation fallback ${psPlatform}! Status: ${fallbackResult.status}`,
+                );
+                result = fallbackResult;
+                break; // Found a match, stop checking
+              } else {
+                console.log(
+                  `❌ No match in PlayStation fallback ${psPlatform}`,
+                );
+              }
+            }
+          } else {
+            console.log(
+              `🚫 Not a PlayStation format, skipping cross-platform fallback`,
+            );
+          }
+        } else {
+          console.log(
+            `✅ Match found, skipping PlayStation cross-platform fallback`,
+          );
+        }
+
+        // Final fallback: if still unknown, return result with the most likely platform info
+        if (result.status === "unknown") {
+          const fallbackEntries = await loadPlatformDAT(orderedPlatforms[0]);
+          result = validateROM(file, hashes, fallbackEntries);
+        }
+      } else {
+        // Single platform, load and validate normally
+        const platformEntries = await loadPlatformDAT(platforms[0]);
+        result = validateROM(file, hashes, platformEntries);
+      }
     } else {
       // Fallback to all DATs if platform detection fails
-      platformEntries = await loadDATFiles();
+      const platformEntries = await loadDATFiles();
+      result = validateROM(file, hashes, platformEntries);
     }
 
-    const result = validateROM(file, hashes, platformEntries);
     results.push(result);
+    console.log(`📊 Final result for ${file.name}:`, {
+      status: result.status,
+      platform: result.platform,
+      region: result.region,
+    });
   }
 
+  console.log(
+    `🏁 Validation complete! Processed ${validFiles.length} files, got ${results.length} results`,
+  );
   return results;
 }

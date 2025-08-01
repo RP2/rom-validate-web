@@ -44,8 +44,8 @@ export const EXTENSION_MAP = {
   ".smc": "Super Nintendo",
   ".sfc": "Super Nintendo",
   ".nes": "Nintendo Entertainment System",
-  // Disc images: all platforms that use .iso
-  ".iso": ["GameCube", "PSP", "PlayStation 2", "Wii"],
+  // Disc images: PS2, PSP, GameCube only (PS1 never used ISO format)
+  ".iso": ["PlayStation 2", "PSP", "GameCube"],
   ".cso": "PSP",
   ".pbp": "PSP",
   // GameCube image formats
@@ -53,9 +53,7 @@ export const EXTENSION_MAP = {
   ".ciso": "GameCube",
   // Wii image format
   ".wbfs": "Wii",
-  // CD-based: PS1 and PS2 may use .bin/.cue
-  ".psx": "PlayStation",
-  ".cue": ["PlayStation", "PlayStation 2"],
+  // CD-based: PS1 first (more common for CD format), then PS2 fallback
   ".bin": ["PlayStation", "PlayStation 2"],
 };
 
@@ -187,7 +185,7 @@ export async function loadBundledDAT(platform: string): Promise<DATEntry[]> {
       datContent.trim().startsWith("<?xml") ? "XML" : "ClrMamePro",
     );
 
-    const entries = parseDAT(datContent);
+    const entries = parseDAT(datContent, platform);
 
     // Cache in both memory and persistent storage
     datCache.set(memoryKey, entries);
@@ -259,7 +257,7 @@ export async function loadLibretroDAT(platform: string): Promise<DATEntry[]> {
       datContent.trim().startsWith("<?xml") ? "XML" : "ClrMamePro",
     );
 
-    const entries = parseDAT(datContent);
+    const entries = parseDAT(datContent, platform);
 
     // Cache in both memory and persistent storage
     datCache.set(memoryKey, entries);
@@ -361,14 +359,18 @@ export function getCacheStatus(): {
       if (key.startsWith("dat-cache-")) {
         persistentCount++;
 
-        // Get the actual content size, not JSON string length
+        // Get the actual content size from the JSON string
         const jsonString = localStorage.getItem(key);
         if (jsonString) {
           try {
-            const cachedData = JSON.parse(jsonString);
-            if (cachedData.content) {
-              // Use the actual content length in bytes
-              totalSize += new Blob([cachedData.content]).size;
+            const cachedData: CachedDATData = JSON.parse(jsonString);
+            if (cachedData.entries) {
+              // Calculate size based on the entries data structure
+              const entriesSize = JSON.stringify(cachedData.entries).length;
+              totalSize += entriesSize;
+            } else {
+              // Fallback to total JSON string length
+              totalSize += jsonString.length;
             }
           } catch (parseError) {
             console.warn(
