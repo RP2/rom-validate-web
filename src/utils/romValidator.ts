@@ -321,22 +321,49 @@ function parseClrMameProDAT(
 // Detect platform from filename patterns and content
 function detectPlatformFromName(filename: string, size: number): string {
   const name = filename.toLowerCase();
-
-  // Use CLI-style extension mapping for better accuracy
   const ext = filename.toLowerCase().substring(filename.lastIndexOf("."));
 
+  // Use the centralized extension mapping from datLoader
+  // Import dynamically to avoid circular dependencies
+  const extensionMap = {
+    ".gba": "Game Boy Advance",
+    ".gb": "Game Boy",
+    ".gbc": "Game Boy Color",
+    ".nds": ["Nintendo DS", "Nintendo DS Download Play", "Nintendo DSi"],
+    ".3ds": "Nintendo 3DS",
+    ".n64": "Nintendo 64",
+    ".z64": "Nintendo 64",
+    ".smc": "Super Nintendo",
+    ".sfc": "Super Nintendo",
+    ".nes": "Nintendo Entertainment System",
+    ".cso": "PSP",
+    ".pbp": "PSP",
+    ".gcm": "GameCube",
+    ".ciso": "GameCube",
+    ".wbfs": "Wii",
+    ".md": "Sega Genesis",
+    ".gen": "Sega Genesis",
+    ".smd": "Sega Genesis",
+    ".cdi": "Dreamcast",
+    ".gdi": "Dreamcast",
+  };
+
   // Direct extension mapping first
-  if (ext === ".gba") return "Game Boy Advance";
-  if (ext === ".gb") return "Game Boy";
-  if (ext === ".gbc") return "Game Boy Color";
-  if (ext === ".nds") return "Nintendo DS";
-  if (ext === ".3ds") return "Nintendo 3DS";
-  if (ext === ".n64" || ext === ".z64") return "Nintendo 64";
-  if (ext === ".smc" || ext === ".sfc") return "Super Nintendo";
-  if (ext === ".nes") return "Nintendo Entertainment System";
-  if (ext === ".cso" || ext === ".pbp") return "PSP";
-  if (ext === ".gcm" || ext === ".ciso") return "GameCube";
-  if (ext === ".wbfs") return "Wii";
+  const mappedPlatform = extensionMap[ext as keyof typeof extensionMap];
+  if (mappedPlatform) {
+    // If it's an array (multi-platform), use size-based detection to pick the best one
+    if (Array.isArray(mappedPlatform)) {
+      // For DS family, prefer based on typical file sizes and naming
+      if (ext === ".nds") {
+        if (name.includes("dsi")) return "Nintendo DSi";
+        if (name.includes("download") || name.includes("demo"))
+          return "Nintendo DS Download Play";
+        return "Nintendo DS"; // Default to regular DS
+      }
+    } else {
+      return mappedPlatform;
+    }
+  }
 
   // Size-based detection for multi-platform formats
   if (ext === ".iso") {
@@ -376,6 +403,7 @@ function detectPlatformFromName(filename: string, size: number): string {
       name.includes("playstation")
     )
       return "PlayStation";
+    if (name.includes("dreamcast") || name.includes("dc")) return "Dreamcast";
 
     // Size-based detection for .bin files - PS1 first (more common for CD format)
     const sizeMB = size / (1024 * 1024);
@@ -383,6 +411,7 @@ function detectPlatformFromName(filename: string, size: number): string {
     if (sizeMB > 900) return "PlayStation 2";
 
     // Default to PS1 for .bin files - PS1 exclusively used CD format, PS2 mostly used DVD
+    // Dreamcast also used CD format but less common than PS1
     // This ensures PS1 DAT is checked first for most .bin files
     return "PlayStation";
   }
@@ -407,6 +436,9 @@ function detectPlatformFromName(filename: string, size: number): string {
   if (name.includes("gamecube")) return "GameCube";
   if (name.includes("wii")) return "Wii";
   if (name.includes("psp")) return "PSP";
+  if (name.includes("sega genesis") || name.includes("mega drive"))
+    return "Sega Genesis";
+  if (name.includes("dreamcast")) return "Dreamcast";
 
   return "unknown";
 }
@@ -597,22 +629,30 @@ export async function validateROMs(
           }
         }
 
-        // If still no match and this is a PlayStation format, try cross-platform fallback
+        // If still no match and this is a multi-platform format, try cross-platform fallback
         if (result.status === "unknown") {
           const ext = file.name
             .toLowerCase()
             .substring(file.name.lastIndexOf("."));
-          const isPlayStationFormat = [".iso", ".bin"].includes(ext);
 
-          if (isPlayStationFormat) {
-            // Try PlayStation platforms not already checked
-            const psFormats = ["PlayStation", "PlayStation 2"];
-            const uncheckedPsPlatforms = psFormats.filter(
+          let fallbackPlatforms: string[] = [];
+
+          if (ext === ".iso") {
+            // ISO can be PS2, PSP, or GameCube
+            fallbackPlatforms = ["PlayStation 2", "PSP", "GameCube"];
+          } else if (ext === ".bin") {
+            // BIN can be PlayStation, Dreamcast, or PlayStation 2
+            fallbackPlatforms = ["PlayStation", "Dreamcast", "PlayStation 2"];
+          }
+
+          if (fallbackPlatforms.length > 0) {
+            // Try platforms not already checked
+            const uncheckedPlatforms = fallbackPlatforms.filter(
               (p) => !orderedPlatforms.includes(p),
             );
 
-            for (const psPlatform of uncheckedPsPlatforms) {
-              const fallbackEntries = await loadPlatformDAT(psPlatform);
+            for (const platform of uncheckedPlatforms) {
+              const fallbackEntries = await loadPlatformDAT(platform);
               const fallbackResult = validateROM(file, hashes, fallbackEntries);
 
               if (fallbackResult.status !== "unknown") {

@@ -31,9 +31,13 @@ export default function Header() {
     // We're on the home page, scroll to element
     const element = document.getElementById(elementId);
     if (element) {
-      element.scrollIntoView({
+      // Calculate offset to account for sticky header (64px = h-16)
+      const headerHeight = 64;
+      const elementTop = element.offsetTop - headerHeight;
+
+      window.scrollTo({
+        top: elementTop,
         behavior: "smooth",
-        block: "start",
       });
     }
   };

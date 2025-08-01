@@ -29,6 +29,8 @@ export const PLATFORMS = {
   PSP: "metadat/no-intro/Sony - PlayStation Portable.dat",
   GameCube: "metadat/redump/Nintendo - GameCube.dat",
   Wii: "metadat/redump/Nintendo - Wii.dat",
+  "Sega Genesis": "metadat/no-intro/Sega - Mega Drive - Genesis.dat",
+  Dreamcast: "metadat/redump/Sega - Dreamcast.dat",
 };
 
 // Extension to platform mapping
@@ -53,8 +55,15 @@ export const EXTENSION_MAP = {
   ".ciso": "GameCube",
   // Wii image format
   ".wbfs": "Wii",
-  // CD-based: PS1 first (more common for CD format), then PS2 fallback
-  ".bin": ["PlayStation", "PlayStation 2"],
+  // CD-based: PS1, Dreamcast first (more common for CD format), then PS2 fallback
+  ".bin": ["PlayStation", "Dreamcast", "PlayStation 2"],
+  // Sega Genesis/Mega Drive formats
+  ".md": "Sega Genesis",
+  ".gen": "Sega Genesis",
+  ".smd": "Sega Genesis",
+  // Dreamcast formats
+  ".cdi": "Dreamcast",
+  ".gdi": "Dreamcast",
 };
 
 // Extensions that are prone to encryption
@@ -180,6 +189,9 @@ export async function loadBundledDAT(platform: string): Promise<DATEntry[]> {
     const datContent = await response.text();
 
     const entries = parseDAT(datContent, platform);
+    console.log(
+      `📦 Loaded bundled DAT for ${platform}: ${entries.length} entries`,
+    );
 
     // Cache in both memory and persistent storage
     datCache.set(memoryKey, entries);
@@ -230,6 +242,9 @@ export async function loadLibretroDAT(platform: string): Promise<DATEntry[]> {
 
     const datContent = await response.text();
     const entries = parseDAT(datContent, platform);
+    console.log(
+      `🌐 Downloaded Libretro DAT for ${platform}: ${entries.length} entries`,
+    );
 
     // Cache in both memory and persistent storage
     datCache.set(memoryKey, entries);

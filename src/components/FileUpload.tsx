@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Upload, File, X, CheckCircle, AlertCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, File, Upload, X } from "lucide-react";
 import { validateROMs, type ValidationResult } from "@/utils/romValidator";
 
 interface UploadedFile {
@@ -335,15 +335,15 @@ export default function FileUpload() {
               id="file-input"
               type="file"
               multiple
-              accept=".rom,.bin,.cue,.iso,.nds,.3ds,.gba,.gb,.gbc,.smc,.sfc,.nes,.n64,.z64,.gen,.md,.32x,.gg,.ms,.pce,.tg16,.lynx,.ngp,.ngc,.ws,.wsc,.a26,.a52,.a78,.col,.int,.vectrex"
+              accept=".bin,.cue,.iso,.nds,.3ds,.gba,.gb,.gbc,.smc,.sfc,.nes,.n64,.z64,.gen,.md,.32x,.gg,.ms,.pce,.tg16,.lynx,.ngp,.ngc,.ws,.wsc,.a26,.a52,.a78,.col,.int,.vectrex"
               onChange={handleFileSelect}
               className="absolute inset-0 cursor-pointer opacity-0"
             />
             Select Files
           </Button>
           <p className="text-muted-foreground text-xs">
-            Supports: ROM, BIN, ISO, NDS, 3DS, GBA, GB, GBC, N64, SNES, NES and
-            other popular game file formats
+            Supports: BIN, ISO, NDS, 3DS, GBA, GB, GBC, N64, SNES, NES and other
+            popular game file formats
           </p>
         </div>
       </div>
