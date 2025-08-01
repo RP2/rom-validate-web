@@ -103,18 +103,13 @@ export function parseDAT(
   datContent: string,
   knownPlatform?: string,
 ): DATEntry[] {
-  console.log("📄 DAT content preview:", datContent.substring(0, 500));
-  console.log("📄 DAT content length:", datContent.length);
-
   // Detect format by checking the content
   if (
     datContent.trim().startsWith("<?xml") ||
     datContent.includes("<datafile>")
   ) {
-    console.log("📄 Detected XML format");
     return parseXMLDAT(datContent, knownPlatform);
   } else {
-    console.log("📄 Detected ClrMamePro format");
     return parseClrMameProDAT(datContent, knownPlatform);
   }
 }
@@ -170,8 +165,6 @@ function parseClrMameProDAT(
   const entries: DATEntry[] = [];
   const lines = datContent.split("\n");
 
-  console.log("📄 Parsing ClrMamePro with", lines.length, "lines");
-
   let currentGame: any = {};
   let inGame = false;
   let inRom = false;
@@ -183,21 +176,14 @@ function parseClrMameProDAT(
     const line = lines[lineIndex];
     const trimmed = line.trim();
 
-    // Debug first few lines
-    if (lineIndex < 20) {
-      console.log(`Line ${lineIndex}: "${trimmed}"`);
-    }
-
     // Skip clrmamepro header block
     if (trimmed.startsWith("clrmamepro (")) {
       inClrMameProHeader = true;
-      console.log("📄 Found clrmamepro header block");
       continue;
     }
 
     if (inClrMameProHeader && trimmed === ")") {
       inClrMameProHeader = false;
-      console.log("📄 End of clrmamepro header block");
       continue;
     }
 
@@ -210,33 +196,19 @@ function parseClrMameProDAT(
       currentGame = {};
       gameCount++;
 
-      if (gameCount <= 3) {
-        console.log("📄 Found game block:", trimmed);
-      }
-
       // For multi-line game blocks, the name is usually on the next line
       // But check if name is on the same line first
       const nameMatch = trimmed.match(/name\s+"([^"]+)"/);
       if (nameMatch) {
         currentGame.name = nameMatch[1];
-        if (gameCount <= 3) {
-          console.log("📄 Game name (same line):", currentGame.name);
-        }
       }
     } else if (trimmed === ")" && inGame && !inRom) {
       // End of game block
       inGame = false;
-      if (gameCount <= 3) {
-        console.log("📄 End of game block for:", currentGame.name);
-      }
       currentGame = {};
     } else if (trimmed.startsWith("rom (") && inGame) {
       inRom = true;
       currentRom = {};
-
-      if (gameCount <= 3) {
-        console.log("📄 Found rom block:", trimmed);
-      }
 
       // Parse rom attributes from the same line
       const nameMatch = trimmed.match(/name\s+"([^"]+)"/);
@@ -278,14 +250,6 @@ function parseClrMameProDAT(
             platform,
             region,
           });
-
-          if (entries.length <= 3) {
-            console.log("📄 Added entry:", {
-              name: currentGame.name,
-              size: currentRom.size,
-              crc32: currentRom.crc32,
-            });
-          }
         }
 
         currentRom = {};
@@ -317,14 +281,6 @@ function parseClrMameProDAT(
           platform,
           region,
         });
-
-        if (entries.length <= 3) {
-          console.log("📄 Added entry:", {
-            name: currentGame.name,
-            size: currentRom.size,
-            crc32: currentRom.crc32,
-          });
-        }
       }
 
       currentRom = {};
@@ -349,9 +305,6 @@ function parseClrMameProDAT(
 
       if (nameMatch && !currentGame.name) {
         currentGame.name = nameMatch[1];
-        if (gameCount <= 3) {
-          console.log("📄 Game name (separate line):", currentGame.name);
-        }
       }
       if (descMatch) {
         currentGame.description = descMatch[1];
@@ -362,11 +315,6 @@ function parseClrMameProDAT(
     }
   }
 
-  console.log(
-    "📄 ClrMamePro parsing complete:",
-    entries.length,
-    "entries found",
-  );
   return entries;
 }
 
@@ -528,14 +476,6 @@ export function validateROM(
     const userFileName = normalizeFilename(file.name);
     const datFileName = normalizeFilename(exactMatch.name);
 
-    console.log(`🔍 Filename comparison:`, {
-      userFile: file.name,
-      datEntry: exactMatch.name,
-      userNormalized: userFileName,
-      datNormalized: datFileName,
-      areEqual: userFileName === datFileName,
-    });
-
     const isRenamed = userFileName !== datFileName;
 
     // Ensure suggested name includes file extension
@@ -616,18 +556,11 @@ export async function validateROMs(
     return ext !== ".cue";
   });
 
-  console.log(
-    `📁 Processing ${validFiles.length} files (${files.length - validFiles.length} .cue files skipped)`,
-  );
-
   for (let i = 0; i < validFiles.length; i++) {
     const file = validFiles[i];
 
     onProgress?.(i + 1, validFiles.length, file.name);
 
-    console.log(
-      `📁 Processing file ${i + 1}/${validFiles.length}: ${file.name}`,
-    );
     const hashes = await calculateFileHashes(file);
 
     // Get platform-specific DAT entries based on file extension (CLI-style)
@@ -653,77 +586,41 @@ export async function validateROMs(
 
         result = { status: "unknown" } as ValidationResult;
 
-        console.log(
-          `🎯 Processing ${file.name} - Detected platforms:`,
-          platforms,
-        );
-        console.log(`🎯 Most likely platform: ${mostLikelyPlatform}`);
-        console.log(`🎯 Ordered platforms:`, orderedPlatforms);
-
         // Try platforms one by one until we find a match
         for (const platform of orderedPlatforms) {
-          console.log(`🔍 Trying platform: ${platform}`);
           const platformEntries = await loadPlatformDAT(platform);
           const platformResult = validateROM(file, hashes, platformEntries);
 
           if (platformResult.status !== "unknown") {
-            console.log(
-              `✅ Found match in ${platform}! Status: ${platformResult.status}`,
-            );
             result = platformResult;
             break; // Found a match, stop checking other platforms
-          } else {
-            console.log(`❌ No match in ${platform}`);
           }
         }
 
         // If still no match and this is a PlayStation format, try cross-platform fallback
         if (result.status === "unknown") {
-          console.log(
-            `🔄 No match found in primary platforms, checking PlayStation cross-platform fallback...`,
-          );
           const ext = file.name
             .toLowerCase()
             .substring(file.name.lastIndexOf("."));
           const isPlayStationFormat = [".iso", ".bin"].includes(ext);
 
           if (isPlayStationFormat) {
-            console.log(
-              `🎮 PlayStation format detected, trying cross-platform fallback`,
-            );
             // Try PlayStation platforms not already checked
             const psFormats = ["PlayStation", "PlayStation 2"];
             const uncheckedPsPlatforms = psFormats.filter(
               (p) => !orderedPlatforms.includes(p),
             );
-            console.log(`🔍 Unchecked PS platforms:`, uncheckedPsPlatforms);
 
             for (const psPlatform of uncheckedPsPlatforms) {
-              console.log(`🔍 Trying PlayStation fallback: ${psPlatform}`);
               const fallbackEntries = await loadPlatformDAT(psPlatform);
               const fallbackResult = validateROM(file, hashes, fallbackEntries);
 
               if (fallbackResult.status !== "unknown") {
-                console.log(
-                  `✅ Found match in PlayStation fallback ${psPlatform}! Status: ${fallbackResult.status}`,
-                );
                 result = fallbackResult;
                 break; // Found a match, stop checking
-              } else {
-                console.log(
-                  `❌ No match in PlayStation fallback ${psPlatform}`,
-                );
               }
             }
-          } else {
-            console.log(
-              `🚫 Not a PlayStation format, skipping cross-platform fallback`,
-            );
           }
-        } else {
-          console.log(
-            `✅ Match found, skipping PlayStation cross-platform fallback`,
-          );
         }
 
         // Final fallback: if still unknown, return result with the most likely platform info
@@ -743,15 +640,7 @@ export async function validateROMs(
     }
 
     results.push(result);
-    console.log(`📊 Final result for ${file.name}:`, {
-      status: result.status,
-      platform: result.platform,
-      region: result.region,
-    });
   }
 
-  console.log(
-    `🏁 Validation complete! Processed ${validFiles.length} files, got ${results.length} results`,
-  );
   return results;
 }

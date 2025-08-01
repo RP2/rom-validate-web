@@ -118,7 +118,9 @@ All commands are run from the root of the project:
 | `npm run dev`             | Starts local dev server at `localhost:4321`      |
 | `npm run build`           | Build your production site to `./dist/`          |
 | `npm run preview`         | Preview your build locally, before deploying     |
-| `node test-config.mjs`    | Test CLI-compatible configuration                |
+| `npm run test`            | Run all tests                                    |
+| `npm run test:config`     | Test CLI-compatible configuration                |
+| `npm run test:dat-urls`   | Test DAT URL accessibility                       |
 | `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
 | `npm run astro -- --help` | Get help using the Astro CLI                     |
 | `npm run format`          | Format all project files with prettier           |
@@ -206,7 +208,7 @@ Access cache management tools via the settings icon (⚙️) in the header:
 This project maintains compatibility with the [CLI version](https://github.com/RP2/auto-rom-validator). When adding features:
 
 1. Keep `datLoader.ts` configuration synchronized with CLI `config.py`
-2. Test with the included `test-config.mjs` script
+2. Test with the included `tests/test-config.mts` script
 3. Follow existing TypeScript patterns and component structure
 
 ## 🔧 Troubleshooting

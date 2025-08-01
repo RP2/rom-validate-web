@@ -94,6 +94,8 @@ export default function ValidationResults() {
       result.status === "renamed" && result.suggestedName && result.file,
   );
 
+  const unknownFiles = results.filter((result) => result.status === "unknown");
+
   const handleApplyRenames = async () => {
     if (filesToRename.length === 0) {
       alert("No files need renaming.");
@@ -130,6 +132,188 @@ export default function ValidationResults() {
     } catch (error) {
       console.error("Error downloading renamed files:", error);
       alert("Error downloading renamed files. Please try again.");
+    }
+  };
+
+  const handleDownloadReport = () => {
+    if (!summary || results.length === 0) {
+      alert("No validation results to export.");
+      return;
+    }
+
+    try {
+      // Generate comprehensive report
+      const reportLines = [
+        "ROM Validation Report",
+        "===================",
+        "",
+        `Generated: ${new Date().toLocaleString()}`,
+        `Total Files Processed: ${summary.total}`,
+        "",
+        "Summary:",
+        `- Valid: ${summary.valid}`,
+        `- Invalid: ${summary.invalid}`,
+        `- Unknown: ${summary.unknown}`,
+        `- Renamed: ${summary.renamed}`,
+        "",
+        `Platforms Detected: ${summary.platforms.join(", ")}`,
+        "",
+        "Detailed Results:",
+        "================",
+        "",
+      ];
+
+      // Add detailed results for each file
+      results.forEach((result, index) => {
+        reportLines.push(`${index + 1}. ${result.filename}`);
+        reportLines.push(`   Status: ${result.status.toUpperCase()}`);
+        reportLines.push(
+          `   Size: ${(result.size / 1024 / 1024).toFixed(2)} MB`,
+        );
+
+        if (result.platform) {
+          reportLines.push(`   Platform: ${result.platform}`);
+        }
+
+        if (result.region) {
+          reportLines.push(`   Region: ${result.region}`);
+        }
+
+        reportLines.push(`   Hashes:`);
+        reportLines.push(`     CRC32: ${result.hashes.crc32}`);
+        reportLines.push(`     MD5: ${result.hashes.md5}`);
+        reportLines.push(`     SHA1: ${result.hashes.sha1}`);
+
+        if (result.matchedEntry) {
+          reportLines.push(`   Matched ROM: ${result.matchedEntry.name}`);
+        }
+
+        if (result.suggestedName) {
+          reportLines.push(`   Suggested Name: ${result.suggestedName}`);
+        }
+
+        if (result.issues && result.issues.length > 0) {
+          reportLines.push(`   Issues:`);
+          result.issues.forEach((issue) => {
+            reportLines.push(`     - ${issue}`);
+          });
+        }
+
+        reportLines.push("");
+      });
+
+      // Add summary of actions needed
+      reportLines.push("Actions Required:");
+      reportLines.push("================");
+
+      if (summary.renamed > 0) {
+        reportLines.push(
+          `- ${summary.renamed} files need renaming for proper organization`,
+        );
+      }
+
+      if (summary.unknown > 0) {
+        reportLines.push(
+          `- ${summary.unknown} files could not be identified and may need manual review`,
+        );
+      }
+
+      if (summary.invalid > 0) {
+        reportLines.push(`- ${summary.invalid} files have validation issues`);
+      }
+
+      if (summary.valid === summary.total) {
+        reportLines.push("- All files are properly validated! ✓");
+      }
+
+      // Create and download the report
+      const reportContent = reportLines.join("\n");
+      const blob = new Blob([reportContent], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `rom-validation-report-${new Date().toISOString().split("T")[0]}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error generating report:", error);
+      alert("Error generating report. Please try again.");
+    }
+  };
+
+  const handleExportUnknownList = () => {
+    if (unknownFiles.length === 0) {
+      alert("No unknown files to export.");
+      return;
+    }
+
+    try {
+      const reportLines = [
+        "Unknown ROM Files List",
+        "=====================",
+        "",
+        `Generated: ${new Date().toLocaleString()}`,
+        `Total Unknown Files: ${unknownFiles.length}`,
+        "",
+        "Files that could not be identified:",
+        "===================================",
+        "",
+      ];
+
+      unknownFiles.forEach((result, index) => {
+        reportLines.push(`${index + 1}. ${result.filename}`);
+        reportLines.push(
+          `   Size: ${(result.size / 1024 / 1024).toFixed(2)} MB`,
+        );
+
+        if (result.platform) {
+          reportLines.push(`   Detected Platform: ${result.platform}`);
+        }
+
+        if (result.region) {
+          reportLines.push(`   Detected Region: ${result.region}`);
+        }
+
+        reportLines.push(`   CRC32: ${result.hashes.crc32}`);
+        reportLines.push(`   MD5: ${result.hashes.md5}`);
+        reportLines.push(`   SHA1: ${result.hashes.sha1}`);
+
+        if (result.issues && result.issues.length > 0) {
+          reportLines.push(`   Notes:`);
+          result.issues.forEach((issue) => {
+            reportLines.push(`     - ${issue}`);
+          });
+        }
+
+        reportLines.push("");
+      });
+
+      reportLines.push("Recommendations:");
+      reportLines.push("===============");
+      reportLines.push(
+        "- Check if these are ROM hacks, translations, or homebrew games",
+      );
+      reportLines.push("- Verify file integrity and source");
+      reportLines.push("- Search online databases using the provided hashes");
+      reportLines.push("- Consider if files need different DAT sources");
+
+      const reportContent = reportLines.join("\n");
+      const blob = new Blob([reportContent], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `unknown-roms-${new Date().toISOString().split("T")[0]}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error exporting unknown list:", error);
+      alert("Error exporting unknown list. Please try again.");
     }
   };
 
@@ -359,7 +543,7 @@ export default function ValidationResults() {
 
           {/* Actions */}
           <div className="border-border mt-6 flex gap-3 border-t pt-6">
-            <Button>
+            <Button onClick={handleDownloadReport}>
               <Download className="mr-2 h-4 w-4" />
               Download Report
             </Button>
@@ -368,7 +552,11 @@ export default function ValidationResults() {
                 Apply Renames (Download {filesToRename.length} Files)
               </Button>
             )}
-            <Button variant="outline">Export Unknown List</Button>
+            {unknownFiles.length > 0 && (
+              <Button variant="outline" onClick={handleExportUnknownList}>
+                Export Unknown List ({unknownFiles.length} Files)
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

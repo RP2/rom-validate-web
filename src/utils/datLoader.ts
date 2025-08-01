@@ -176,14 +176,8 @@ export async function loadBundledDAT(platform: string): Promise<DATEntry[]> {
   }
 
   try {
-    console.log(`📥 Loading bundled DAT for ${platform}...`);
     const response = await fetch(datPath);
     const datContent = await response.text();
-
-    console.log(
-      `📄 DAT format detection for ${platform}:`,
-      datContent.trim().startsWith("<?xml") ? "XML" : "ClrMamePro",
-    );
 
     const entries = parseDAT(datContent, platform);
 
@@ -191,7 +185,6 @@ export async function loadBundledDAT(platform: string): Promise<DATEntry[]> {
     datCache.set(memoryKey, entries);
     saveToPersistentCache(platform, "bundled", entries);
 
-    console.log(`✅ Loaded ${entries.length} entries for ${platform}`);
     return entries;
   } catch (error) {
     console.error(`Failed to load bundled DAT file for ${platform}:`, error);
@@ -229,41 +222,19 @@ export async function loadLibretroDAT(platform: string): Promise<DATEntry[]> {
   const datUrl = `${LIBRETRO_BASE_URL}/${encodedPath}`;
 
   try {
-    console.log(`🌐 Fetching DAT for ${platform} from Libretro database...`);
-    console.log(`🔗 Full URL: ${datUrl}`);
-
     const response = await fetch(datUrl);
-    console.log(
-      `📡 Response status: ${response.status} ${response.statusText}`,
-    );
-    console.log(
-      `📡 Response headers:`,
-      Object.fromEntries(response.headers.entries()),
-    );
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     const datContent = await response.text();
-    console.log(`📄 Response content length: ${datContent.length} characters`);
-    console.log(
-      `📄 Content preview (first 200 chars):`,
-      datContent.substring(0, 200),
-    );
-
-    console.log(
-      `📄 DAT format detection for ${platform}:`,
-      datContent.trim().startsWith("<?xml") ? "XML" : "ClrMamePro",
-    );
-
     const entries = parseDAT(datContent, platform);
 
     // Cache in both memory and persistent storage
     datCache.set(memoryKey, entries);
     saveToPersistentCache(platform, "libretro", entries);
 
-    console.log(`✅ Loaded ${entries.length} entries for ${platform}`);
     return entries;
   } catch (error) {
     console.error(`Failed to load Libretro DAT file for ${platform}:`, error);

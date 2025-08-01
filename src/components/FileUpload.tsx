@@ -78,14 +78,12 @@ export default function FileUpload() {
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log("Drag over detected");
     setIsDragOver(true);
   }, []);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log("Drag enter detected");
     setIsDragOver(true);
   }, []);
 
@@ -110,79 +108,39 @@ export default function FileUpload() {
     setIsDragOver(false);
 
     try {
-      console.log("🎯 Drop event triggered");
-      console.log("📦 DataTransfer object:", e.dataTransfer);
-      console.log("📁 DataTransfer.files:", e.dataTransfer.files);
-      console.log("📁 DataTransfer.files.length:", e.dataTransfer.files.length);
-      console.log("🔗 DataTransfer.types:", e.dataTransfer.types);
-      console.log("📋 DataTransfer.items:", e.dataTransfer.items);
-      console.log(
-        "📋 DataTransfer.items.length:",
-        e.dataTransfer.items?.length || 0,
-      );
-
       // First, try to get files from the files property
       const droppedFiles = Array.from(e.dataTransfer.files);
 
       if (droppedFiles.length > 0) {
-        console.log("✅ Files found in .files property:", droppedFiles.length);
-        console.log(
-          "📄 File details:",
-          droppedFiles.map((f) => ({
-            name: f.name,
-            size: f.size,
-            type: f.type,
-            lastModified: f.lastModified,
-          })),
-        );
         addFiles(droppedFiles);
         return;
       }
 
       // If no files in .files, try to extract from DataTransferItems
       if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-        console.log("🔍 Checking DataTransferItems for files...");
         const itemFiles: File[] = [];
 
         for (let i = 0; i < e.dataTransfer.items.length; i++) {
           const item = e.dataTransfer.items[i];
-          console.log(`📋 Item ${i}:`, {
-            kind: item.kind,
-            type: item.type,
-          });
 
           if (item.kind === "file") {
             const file = item.getAsFile();
             if (file) {
-              console.log("📁 Found file from item:", {
-                name: file.name,
-                size: file.size,
-                type: file.type,
-              });
               itemFiles.push(file);
             }
           }
         }
 
         if (itemFiles.length > 0) {
-          console.log("✅ Files extracted from items:", itemFiles.length);
           addFiles(itemFiles);
           return;
         }
       }
 
-      // Log what we found instead
-      console.warn("⚠️ No files found in drop data");
-      console.log("🔍 Available data types:", e.dataTransfer.types);
-
       // Try to get text data to see what's being dropped
       for (const type of e.dataTransfer.types) {
         try {
           const data = e.dataTransfer.getData(type);
-          console.log(
-            `📋 Data for type '${type}':`,
-            data.slice(0, 200) + (data.length > 200 ? "..." : ""),
-          );
 
           // Handle file:// URLs (common when dragging from file managers)
           if (
@@ -191,18 +149,15 @@ export default function FileUpload() {
               type === "text/plain") &&
             data.startsWith("file://")
           ) {
-            console.log(
-              "🔗 Detected file:// URL, attempting to convert to File object",
-            );
             await handleFileUrl(data);
             return;
           }
         } catch (err) {
-          console.log(`❌ Could not get data for type '${type}':`, err);
+          // Silently continue to next data type
         }
       }
     } catch (error) {
-      console.error("❌ Error handling dropped files:", error);
+      console.error("Error handling dropped files:", error);
     }
   }, []);
 
@@ -214,31 +169,13 @@ export default function FileUpload() {
       const filePath = decodeURIComponent(url.replace("file://", ""));
       const fileName = filePath.split("/").pop() || "unknown-file";
 
-      console.log("📁 Extracted file path:", filePath);
-      console.log("📄 File name:", fileName);
-
-      // Try to fetch the file using the File System Access API if available
-      if ("showOpenFilePicker" in window) {
-        console.log(
-          "🔧 File System Access API available, but can't use for security reasons",
-        );
-      }
-
       // For security reasons, browsers don't allow direct access to file:// URLs
       // Show a helpful message to the user
-      console.warn(
-        "⚠️ File dropped as URL, but browsers prevent direct access for security",
-      );
-      console.log(
-        "💡 Suggestion: Try dragging from a different location or use the file picker",
-      );
-
-      // You could show a toast notification here telling the user to use the file picker instead
       alert(
         `File detected: ${fileName}\n\nFor security reasons, files dragged as URLs cannot be accessed directly. Please use the "Select Files" button instead.`,
       );
     } catch (error) {
-      console.error("❌ Error handling file URL:", error);
+      console.error("Error handling file URL:", error);
     }
   };
 
@@ -291,12 +228,9 @@ export default function FileUpload() {
       // Process files locally using the ROM validator
       const fileList = files.map((f) => f.file);
 
-      console.log("Starting validation for", fileList.length, "files");
-
       const results = await validateROMs(
         fileList,
         (current, total, currentFileName) => {
-          console.log(`Processing ${current}/${total}: ${currentFileName}`);
           // Update progress for the current file being processed
           const currentIndex = files.findIndex(
             (f) => f.file.name === currentFileName,
@@ -314,8 +248,6 @@ export default function FileUpload() {
           );
         },
       );
-
-      console.log("Validation completed, results:", results);
 
       // Mark all files as completed
       setFiles((prev) =>
