@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
 ---
 
 <Layout
@@ -39,34 +40,30 @@ import { Badge } from "@/components/ui/badge.tsx";
             </p>
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div class="bg-primary/5 border-primary/20 rounded-lg border p-4">
-                <h4 class="text-primary mb-2 font-semibold">
+              <Alert className="border-primary/20 bg-primary/5">
+                <AlertTitle className="text-primary">
                   Hash Verification
-                </h4>
-                <p class="text-muted-foreground text-sm">
+                </AlertTitle>
+                <AlertDescription>
                   Uses MD5, SHA-1, and CRC32 checksums to verify file integrity
-                </p>
-              </div>
+                </AlertDescription>
+              </Alert>
 
-              <div
-                class="rounded-lg border border-green-500/20 bg-green-500/5 p-4"
-              >
-                <h4 class="mb-2 font-semibold text-green-600">DAT Matching</h4>
-                <p class="text-muted-foreground text-sm">
+              <Alert className="border-green-500/20 bg-green-500/5">
+                <AlertTitle className="text-green-600">DAT Matching</AlertTitle>
+                <AlertDescription>
                   Compares against official No-Intro and Libretro databases
-                </p>
-              </div>
+                </AlertDescription>
+              </Alert>
 
-              <div
-                class="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4"
-              >
-                <h4 class="mb-2 font-semibold text-blue-600">
+              <Alert className="border-blue-500/20 bg-blue-500/5">
+                <AlertTitle className="text-blue-600">
                   Metadata Correction
-                </h4>
-                <p class="text-muted-foreground text-sm">
+                </AlertTitle>
+                <AlertDescription>
                   Provides correct filenames and organizing information
-                </p>
-              </div>
+                </AlertDescription>
+              </Alert>
             </div>
           </div>
         </div>
@@ -80,54 +77,18 @@ import { Badge } from "@/components/ui/badge.tsx";
             Game systems with official DAT file support
           </p>
           <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            <span
-              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
-              >Nintendo DS</span
-            >
-            <span
-              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
-              >Nintendo 3DS</span
-            >
-            <span
-              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
-              >Game Boy Advance</span
-            >
-            <span
-              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
-              >Game Boy / Color</span
-            >
-            <span
-              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
-              >PSP</span
-            >
-            <span
-              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
-              >Nintendo 64</span
-            >
-            <span
-              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
-              >Super Nintendo</span
-            >
-            <span
-              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
-              >Nintendo Entertainment System</span
-            >
-            <span
-              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
-              >PlayStation</span
-            >
-            <span
-              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
-              >PlayStation 2</span
-            >
-            <span
-              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
-              >Sega Genesis</span
-            >
-            <span
-              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
-              >Dreamcast</span
-            >
+            <Badge variant="outline">Nintendo DS</Badge>
+            <Badge variant="outline">Nintendo 3DS</Badge>
+            <Badge variant="outline">Game Boy Advance</Badge>
+            <Badge variant="outline">Game Boy / Color</Badge>
+            <Badge variant="outline">PSP</Badge>
+            <Badge variant="outline">Nintendo 64</Badge>
+            <Badge variant="outline">Super Nintendo</Badge>
+            <Badge variant="outline">Nintendo Entertainment System</Badge>
+            <Badge variant="outline">PlayStation</Badge>
+            <Badge variant="outline">PlayStation 2</Badge>
+            <Badge variant="outline">Sega Genesis</Badge>
+            <Badge variant="outline">Dreamcast</Badge>
           </div>
         </div>
       </div>
@@ -208,32 +169,30 @@ import { Badge } from "@/components/ui/badge.tsx";
           <CardTitle>Privacy & Security</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div class="rounded-lg border border-green-500/20 bg-green-500/5 p-4">
-            <h4 class="mb-2 font-semibold text-green-600">Local Processing</h4>
-            <p class="text-muted-foreground text-sm">
+          <Alert className="border-green-500/20 bg-green-500/5">
+            <AlertTitle className="text-green-600">Local Processing</AlertTitle>
+            <AlertDescription>
               Your ROM files never leave your computer. All hash calculation and
               validation happens locally in your browser using Web APIs.
-            </p>
-          </div>
+            </AlertDescription>
+          </Alert>
 
-          <div class="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
-            <h4 class="mb-2 font-semibold text-blue-600">No File Upload</h4>
-            <p class="text-muted-foreground text-sm">
+          <Alert className="border-blue-500/20 bg-blue-500/5">
+            <AlertTitle className="text-blue-600">No File Upload</AlertTitle>
+            <AlertDescription>
               Unlike other validation services, we don't require you to upload
               your files. Only file metadata and hashes are used for validation.
-            </p>
-          </div>
+            </AlertDescription>
+          </Alert>
 
-          <div
-            class="rounded-lg border border-purple-500/20 bg-purple-500/5 p-4"
-          >
-            <h4 class="mb-2 font-semibold text-purple-600">Open Source</h4>
-            <p class="text-muted-foreground text-sm">
+          <Alert className="border-purple-500/20 bg-purple-500/5">
+            <AlertTitle className="text-purple-600">Open Source</AlertTitle>
+            <AlertDescription>
               This project is open source and based on the proven
               auto-rom-validator Python script. You can review the code and run
               it locally if desired.
-            </p>
-          </div>
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
 
@@ -243,16 +202,14 @@ import { Badge } from "@/components/ui/badge.tsx";
           <CardTitle>Legal Notice</CardTitle>
         </CardHeader>
         <CardContent>
-          <div
-            class="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4"
-          >
-            <p class="text-muted-foreground text-sm">
+          <Alert className="border-yellow-500/20 bg-yellow-500/5">
+            <AlertDescription>
               <strong>Important:</strong> This tool is intended solely for legitimate
               game preservation and backups of games you own. It is not designed
               to facilitate piracy. Users are responsible for complying with applicable
               copyright laws in their jurisdiction.
-            </p>
-          </div>
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
 
