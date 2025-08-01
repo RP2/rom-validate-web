@@ -1,0 +1,177 @@
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Moon, Sun, Menu, Github, Settings } from "lucide-react";
+
+export default function Header() {
+  const toggleTheme = () => {
+    const html = document.documentElement;
+    if (html.classList.contains("dark")) {
+      html.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    } else {
+      html.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    }
+  };
+
+  const handleScrollTo = (elementId: string) => {
+    // Check if we're on the home page
+    if (window.location.pathname !== "/") {
+      // Navigate to home page with hash
+      window.location.href = `/#${elementId}`;
+      return;
+    }
+
+    // We're on the home page, scroll to element
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }
+  };
+
+  const handleClearCache = async () => {
+    try {
+      const { clearDATCache } = await import("@/utils/datLoader");
+      clearDATCache();
+      alert("DAT cache cleared successfully!");
+    } catch (error) {
+      console.error("Failed to clear cache:", error);
+      alert("Failed to clear cache");
+    }
+  };
+
+  const handleShowCacheStatus = async () => {
+    try {
+      const { getCacheStatus } = await import("@/utils/datLoader");
+      const status = getCacheStatus();
+      alert(
+        `Cache Status:\n` +
+          `Memory: ${status.memory} DATs\n` +
+          `Persistent: ${status.persistent} DATs\n` +
+          `Storage Size: ${status.totalSize}`,
+      );
+    } catch (error) {
+      console.error("Failed to get cache status:", error);
+      alert("Failed to get cache status");
+    }
+  };
+
+  return (
+    <header className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 w-full border-b backdrop-blur">
+      <div className="container mx-auto flex h-16 items-center px-4">
+        {/* Left side - Logo */}
+        <div className="flex items-center space-x-2">
+          <div className="bg-primary flex h-8 w-8 items-center justify-center rounded-md">
+            <span className="text-primary-foreground text-sm font-bold">
+              RV
+            </span>
+          </div>
+          <a className="text-lg font-bold hover:underline" href="/">
+            ROM Validator
+          </a>
+        </div>
+
+        {/* Center - Navigation */}
+        <nav className="absolute left-1/2 hidden -translate-x-1/2 transform items-center space-x-6 md:flex">
+          <button
+            onClick={() => handleScrollTo("features")}
+            className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+          >
+            Features
+          </button>
+          <button
+            onClick={() => handleScrollTo("upload")}
+            className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+          >
+            Upload
+          </button>
+          <a
+            href="/about"
+            className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+          >
+            About
+          </a>
+        </nav>
+
+        {/* Right side - Actions */}
+        <div className="ml-auto flex items-center space-x-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleTheme}
+            className="h-9 w-9 p-0"
+          >
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
+          </Button>
+
+          <Button variant="ghost" size="sm" asChild className="h-9 w-9 p-0">
+            <a
+              href="https://github.com/RP2/rom-validate-web"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Github className="h-4 w-4" />
+              <span className="sr-only">View on GitHub</span>
+            </a>
+          </Button>
+
+          {/* Developer Tools Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+                <Settings className="h-4 w-4" />
+                <span className="sr-only">Developer tools</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleShowCacheStatus}>
+                Cache Status
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleClearCache}>
+                Clear DAT Cache
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild className="md:hidden">
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+                <Menu className="h-4 w-4" />
+                <span className="sr-only">Toggle menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleScrollTo("features")}>
+                Features
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleScrollTo("upload")}>
+                Upload
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <a href="/about">About</a>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleShowCacheStatus}>
+                Cache Status
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleClearCache}>
+                Clear DAT Cache
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </header>
+  );
+}

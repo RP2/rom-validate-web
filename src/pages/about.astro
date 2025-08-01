@@ -1,0 +1,314 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+---
+
+<Layout
+  title="About ROM Validator"
+  description="Learn about ROM validation, DAT files, and how to preserve your game collection."
+>
+  <main class="container mx-auto max-w-4xl px-4 py-8">
+    <div class="space-y-8">
+      <!-- Header -->
+      <div class="space-y-4 text-center">
+        <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">
+          About Web ROM Validator
+        </h1>
+        <p class="text-muted-foreground mx-auto max-w-2xl text-lg">
+          Understanding ROM validation and digital game preservation
+        </p>
+      </div>
+
+      <!-- What is ROM Validation -->
+      <div class="bg-card rounded-lg border shadow-sm">
+        <div class="p-6">
+          <h2 class="mb-4 text-2xl font-semibold">What is ROM Validation?</h2>
+          <div class="space-y-4">
+            <p class="text-muted-foreground">
+              ROM validation is the process of verifying that your game backup
+              files are authentic, complete, and match known good dumps. This
+              ensures that your preserved games are accurate representations of
+              the original cartridges or discs.
+            </p>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div class="bg-primary/5 border-primary/20 rounded-lg border p-4">
+                <h4 class="text-primary mb-2 font-semibold">
+                  Hash Verification
+                </h4>
+                <p class="text-muted-foreground text-sm">
+                  Uses MD5, SHA-1, and CRC32 checksums to verify file integrity
+                </p>
+              </div>
+
+              <div
+                class="rounded-lg border border-green-500/20 bg-green-500/5 p-4"
+              >
+                <h4 class="mb-2 font-semibold text-green-600">DAT Matching</h4>
+                <p class="text-muted-foreground text-sm">
+                  Compares against official No-Intro and Libretro databases
+                </p>
+              </div>
+
+              <div
+                class="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4"
+              >
+                <h4 class="mb-2 font-semibold text-blue-600">
+                  Metadata Correction
+                </h4>
+                <p class="text-muted-foreground text-sm">
+                  Provides correct filenames and organizing information
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Supported Platforms -->
+      <div class="bg-card rounded-lg border shadow-sm">
+        <div class="p-6">
+          <h2 class="mb-2 text-2xl font-semibold">Supported Platforms</h2>
+          <p class="text-muted-foreground mb-4">
+            Game systems with official DAT file support
+          </p>
+          <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+            <span
+              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
+              >Nintendo DS</span
+            >
+            <span
+              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
+              >Nintendo 3DS</span
+            >
+            <span
+              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
+              >Game Boy Advance</span
+            >
+            <span
+              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
+              >Game Boy Color</span
+            >
+            <span
+              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
+              >Game Boy</span
+            >
+            <span
+              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
+              >Nintendo 64</span
+            >
+            <span
+              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
+              >Super Nintendo</span
+            >
+            <span
+              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
+              >Nintendo Entertainment System</span
+            >
+            <span
+              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
+              >PlayStation</span
+            >
+            <span
+              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
+              >PlayStation 2</span
+            >
+            <span
+              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
+              >Sega Genesis</span
+            >
+            <span
+              class="border-border bg-background text-foreground inline-flex items-center justify-center rounded-md border px-3 py-1 text-xs font-medium"
+              >Dreamcast</span
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- How It Works -->
+      <Card>
+        <CardHeader>
+          <CardTitle>How It Works</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="space-y-6">
+            <div class="flex items-start gap-4">
+              <div
+                class="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
+              >
+                1
+              </div>
+              <div>
+                <h4 class="mb-1 font-semibold">Upload Your Files</h4>
+                <p class="text-muted-foreground text-sm">
+                  Select ROM files from your computer. Files are processed
+                  locally in your browser for privacy.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-4">
+              <div
+                class="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
+              >
+                2
+              </div>
+              <div>
+                <h4 class="mb-1 font-semibold">Hash Calculation</h4>
+                <p class="text-muted-foreground text-sm">
+                  The app calculates MD5, SHA-1, and CRC32 hashes of your files
+                  to uniquely identify them.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-4">
+              <div
+                class="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
+              >
+                3
+              </div>
+              <div>
+                <h4 class="mb-1 font-semibold">DAT Comparison</h4>
+                <p class="text-muted-foreground text-sm">
+                  Hashes are compared against official DAT databases to verify
+                  authenticity and get correct names.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-4">
+              <div
+                class="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
+              >
+                4
+              </div>
+              <div>
+                <h4 class="mb-1 font-semibold">Results & Recommendations</h4>
+                <p class="text-muted-foreground text-sm">
+                  Get detailed validation results with suggestions for file
+                  organization and renaming.
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- Privacy & Security -->
+      <Card>
+        <CardHeader>
+          <CardTitle>Privacy & Security</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div class="rounded-lg border border-green-500/20 bg-green-500/5 p-4">
+            <h4 class="mb-2 font-semibold text-green-600">Local Processing</h4>
+            <p class="text-muted-foreground text-sm">
+              Your ROM files never leave your computer. All hash calculation and
+              validation happens locally in your browser using Web APIs.
+            </p>
+          </div>
+
+          <div class="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
+            <h4 class="mb-2 font-semibold text-blue-600">No File Upload</h4>
+            <p class="text-muted-foreground text-sm">
+              Unlike other validation services, we don't require you to upload
+              your files. Only file metadata and hashes are used for validation.
+            </p>
+          </div>
+
+          <div
+            class="rounded-lg border border-purple-500/20 bg-purple-500/5 p-4"
+          >
+            <h4 class="mb-2 font-semibold text-purple-600">Open Source</h4>
+            <p class="text-muted-foreground text-sm">
+              This project is open source and based on the proven
+              auto-rom-validator Python script. You can review the code and run
+              it locally if desired.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- Legal Notice -->
+      <Card>
+        <CardHeader>
+          <CardTitle>Legal Notice</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div
+            class="rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4"
+          >
+            <p class="text-muted-foreground text-sm">
+              <strong>Important:</strong> This tool is intended solely for legitimate
+              game preservation and backups of games you own. It is not designed
+              to facilitate piracy. Users are responsible for complying with applicable
+              copyright laws in their jurisdiction.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <!-- External Resources -->
+      <Card>
+        <CardHeader>
+          <CardTitle>External Resources</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div class="space-y-2">
+              <h4 class="font-semibold">DAT File Sources</h4>
+              <div class="space-y-1">
+                <a
+                  href="https://datomatic.no-intro.org/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-primary block text-sm hover:underline"
+                >
+                  No-Intro DAT Files
+                </a>
+                <a
+                  href="http://redump.org/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-primary block text-sm hover:underline"
+                >
+                  Redump DAT Files
+                </a>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <h4 class="font-semibold">Preservation Communities</h4>
+              <div class="space-y-1">
+                <a
+                  href="https://github.com/RP2/auto-rom-validator"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-primary block text-sm hover:underline"
+                >
+                  Original Python Project
+                </a>
+                <a
+                  href="https://emulation.gametechwiki.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-primary block text-sm hover:underline"
+                >
+                  Emulation Wiki
+                </a>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  </main>
+</Layout>

@@ -1,16 +1,119 @@
 ---
-
+import Layout from "@/layouts/Layout.astro";
+import FileUpload from "@/components/FileUpload.tsx";
+import ValidationResults from "@/components/ValidationResults.tsx";
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<Layout
+  title="ROM Validate Web"
+  description="A web application for validating ROM files using No-Intro and Libretro database DAT files."
+>
+  <main class="container mx-auto max-w-4xl px-4 py-8">
+    <div class="space-y-8 pb-32">
+      <!-- Header Section -->
+      <div class="space-y-4 text-center">
+        <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">
+          ROM Validator
+        </h1>
+        <p class="text-muted-foreground mx-auto max-w-2xl text-lg">
+          Validate and standardize your ROM backup collection using official
+          No-Intro and Libretro database DAT files. Upload your ROM files and
+          get detailed validation results.
+        </p>
+      </div>
+
+      <!-- Features Overview -->
+      <div
+        id="features"
+        class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+      >
+        <div class="bg-card rounded-lg border p-6 shadow-sm">
+          <div
+            class="bg-primary/10 mb-4 flex h-12 w-12 items-center justify-center rounded-lg"
+          >
+            <svg
+              class="text-primary h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+          <h3 class="mb-2 text-lg font-semibold">Multi-Hash Validation</h3>
+          <p class="text-muted-foreground">
+            Checks files using SHA1, MD5, and CRC32 hashes for comprehensive
+            validation.
+          </p>
+        </div>
+
+        <div class="bg-card rounded-lg border p-6 shadow-sm">
+          <div
+            class="bg-primary/10 mb-4 flex h-12 w-12 items-center justify-center rounded-lg"
+          >
+            <svg
+              class="text-primary h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+              ></path>
+            </svg>
+          </div>
+          <h3 class="mb-2 text-lg font-semibold">Auto DAT Fetching</h3>
+          <p class="text-muted-foreground">
+            Automatically downloads the latest DAT files for supported
+            platforms.
+          </p>
+        </div>
+
+        <div class="bg-card rounded-lg border p-6 shadow-sm">
+          <div
+            class="bg-primary/10 mb-4 flex h-12 w-12 items-center justify-center rounded-lg"
+          >
+            <svg
+              class="text-primary h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"
+              ></path>
+            </svg>
+          </div>
+          <h3 class="mb-2 text-lg font-semibold">Smart Renaming</h3>
+          <p class="text-muted-foreground">
+            Standardizes filenames and folders based on official DAT naming
+            conventions.
+          </p>
+        </div>
+      </div>
+
+      <!-- File Upload Section -->
+      <div id="upload" class="bg-card rounded-lg border shadow-sm">
+        <div class="p-6">
+          <h2 class="mb-4 text-2xl font-semibold">Upload ROM Files</h2>
+          <FileUpload client:load />
+        </div>
+      </div>
+
+      <!-- Results Section -->
+      <div id="results-section" class="hidden">
+        <ValidationResults client:load />
+      </div>
+    </div>
+  </main>
+</Layout>
