@@ -52,7 +52,8 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
               <Alert className="border-green-500/20 bg-green-500/5">
                 <AlertTitle className="text-green-600">DAT Matching</AlertTitle>
                 <AlertDescription>
-                  Compares against official No-Intro and Libretro databases
+                  Compares against official No-Intro and Redump databases via
+                  libretro .DAT files
                 </AlertDescription>
               </Alert>
 
@@ -170,27 +171,41 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert className="border-green-500/20 bg-green-500/5">
-            <AlertTitle className="text-green-600">Local Processing</AlertTitle>
+            <AlertTitle className="text-green-600">Complete Privacy</AlertTitle>
             <AlertDescription>
-              Your ROM files never leave your computer. All hash calculation and
-              validation happens locally in your browser using Web APIs.
+              Your ROM files never leave your computer. All processing happens
+              locally in your browser - we only fetch public DAT files for
+              comparison and cache them for 24 hours to improve performance.
             </AlertDescription>
           </Alert>
 
           <Alert className="border-blue-500/20 bg-blue-500/5">
-            <AlertTitle className="text-blue-600">No File Upload</AlertTitle>
+            <AlertTitle className="text-blue-600">No Data Collection</AlertTitle
+            >
             <AlertDescription>
-              Unlike other validation services, we don't require you to upload
-              your files. Only file metadata and hashes are used for validation.
+              This site uses Cloudflare for content delivery but does not track
+              users, store personal data, or use cookies. Only essential browser
+              storage is used for DAT file caching to minimize unnecessary
+              traffic.
             </AlertDescription>
           </Alert>
 
           <Alert className="border-purple-500/20 bg-purple-500/5">
             <AlertTitle className="text-purple-600">Open Source</AlertTitle>
-            <AlertDescription>
-              This project is open source and based on the proven
-              auto-rom-validator Python script. You can review the code and run
-              it locally if desired.
+            <AlertDescription className="inline-block">
+              This project is open source and based on the proven <a
+                href="https://github.com/RP2/auto-rom-validator"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="font-medium italic hover:underline"
+                >auto-rom-validator Python script</a
+              >. You can review the code, run it locally, contribute
+              improvements, or report bugs on <a
+                href="https://github.com/RP2/rom-validate-web"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="font-medium italic hover:underline">GitHub</a
+              >. Contributions and feedback are welcome!
             </AlertDescription>
           </Alert>
         </CardContent>

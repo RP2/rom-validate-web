@@ -4,7 +4,7 @@ A modern web application for validating ROM files using No-Intro and Libretro da
 
 ## ✨ Features
 
-- **Client-side Processing**: Files are processed locally when possible for privacy
+- **Complete Client-side Processing**: All files are processed locally in your browser for privacy
 - **Smart Platform Detection**: Intelligent size-based and filename-based platform detection
 - **Optimized Performance**: Sequential DAT loading with early exit on match detection
 - **Multiple Platform Support**: Nintendo, Sony, Sega, and more
@@ -161,12 +161,13 @@ EXTENSION_MAP = {
 
 ## 🔒 Privacy & Security
 
-- **Client-side Processing**: File hashes are calculated locally using Web Crypto API
-- **No File Upload**: ROM files never leave your browser
-- **Metadata Only**: Only file metadata and hashes are used for validation
+- **Complete Privacy**: All file processing happens locally in your browser - files never leave your computer
+- **No File Upload**: ROM files are never sent to any server
+- **No Data Collection**: No user tracking, personal data storage, or cookies beyond essential DAT caching
 - **Smart Caching**: DAT files cached locally with 24-hour expiry to minimize external requests
 - **Cache Management**: Built-in cache status and cleanup tools in developer settings
 - **Browser Compatibility**: Graceful fallback for browsers with limited crypto support
+- **Open Source**: Full transparency with code available for review and local deployment
 
 ## 📋 Validation Process
 

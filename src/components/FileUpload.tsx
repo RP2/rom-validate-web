@@ -426,9 +426,23 @@ export default function FileUpload() {
                   Validating ROM files...
                 </span>
               </div>
-              <Progress value={45} className="h-2" />
+              <Progress
+                value={
+                  files.length > 0
+                    ? (files.filter((f) => f.status === "completed").length /
+                        files.length) *
+                      100
+                    : 0
+                }
+                className="h-2"
+              />
               <p className="text-muted-foreground text-xs">
-                Processing 3 of 7 files • Downloading DAT files • Calculating
+                Processing{" "}
+                {files.filter((f) => f.status === "completed").length +
+                  (files.filter((f) => f.status === "processing").length > 0
+                    ? 1
+                    : 0)}{" "}
+                of {files.length} files • Downloading DAT files • Calculating
                 hashes
               </p>
             </div>
@@ -443,7 +457,8 @@ export default function FileUpload() {
           <strong>DAT Sources:</strong> This validator uses encrypted Nintendo
           DS DATs (bundled locally) and dynamically fetches public DATs from the
           Libretro database for other platforms.
-          <strong>Privacy:</strong> Files are processed locally when possible.
+          <strong>Privacy:</strong> Files are always processed locally, they are
+          never sent anywhere.
         </AlertDescription>
       </Alert>
     </div>
