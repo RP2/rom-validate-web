@@ -134,53 +134,41 @@ export default function Header() {
           {/* Developer Tools Dropdown */}
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 w-9 cursor-pointer p-0"
-                onPointerDown={(e) => e.stopPropagation()}
-              >
+              <button className="hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md p-0 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50">
                 <Settings className="h-4 w-4" />
                 <span className="sr-only">Developer tools</span>
-              </Button>
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={handleShowCacheStatus}
-                className="cursor-pointer"
-              >
-                Cache Status
+              <DropdownMenuItem onClick={handleShowCacheStatus}>
+                <span className="block w-full cursor-pointer">
+                  Cache Status
+                </span>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={handleClearCache}
-                className="cursor-pointer"
-              >
-                Clear DAT Cache
+              <DropdownMenuItem onClick={handleClearCache}>
+                <span className="block w-full cursor-pointer">
+                  Clear DAT Cache
+                </span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild className="md:hidden">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-9 w-9 cursor-pointer p-0"
-                onPointerDown={(e) => e.stopPropagation()}
-              >
+              <button className="hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md p-0 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50">
                 <Menu className="h-4 w-4" />
                 <span className="sr-only">Toggle menu</span>
-              </Button>
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => handleScrollTo("features")}>
-                <span className="cursor-pointer">Features</span>
+                <span className="block w-full cursor-pointer">Features</span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleScrollTo("upload")}>
-                <span className="cursor-pointer">Upload</span>
+                <span className="block w-full cursor-pointer">Upload</span>
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <a href="/about/" className="cursor-pointer">
+                <a href="/about/" className="block w-full">
                   About
                 </a>
               </DropdownMenuItem>
