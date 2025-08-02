@@ -134,7 +134,12 @@ export default function Header() {
           {/* Developer Tools Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 touch-manipulation p-0"
+                style={{ touchAction: "manipulation" }}
+              >
                 <Settings className="h-4 w-4" />
                 <span className="sr-only">Developer tools</span>
               </Button>
@@ -151,7 +156,12 @@ export default function Header() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 touch-manipulation p-0"
+                style={{ touchAction: "manipulation" }}
+              >
                 <Menu className="h-4 w-4" />
                 <span className="sr-only">Toggle menu</span>
               </Button>
@@ -165,13 +175,6 @@ export default function Header() {
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <a href="/about/">About</a>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleShowCacheStatus}>
-                Cache Status
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleClearCache}>
-                Clear DAT Cache
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
