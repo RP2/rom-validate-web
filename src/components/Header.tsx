@@ -1,14 +1,17 @@
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
 import { Moon, Sun, Menu, Github, Settings } from "lucide-react";
 
 export default function Header() {
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const [devToolsOpen, setDevToolsOpen] = React.useState(false);
+
   const toggleTheme = () => {
     const html = document.documentElement;
     if (html.classList.contains("dark")) {
@@ -41,6 +44,9 @@ export default function Header() {
         behavior: "smooth",
       });
     }
+
+    // Close mobile menu after navigation
+    setMobileMenuOpen(false);
   };
 
   const handleClearCache = async () => {
@@ -48,6 +54,7 @@ export default function Header() {
       const { clearDATCache } = await import("@/utils/datLoader");
       clearDATCache();
       alert("DAT cache cleared successfully!");
+      setDevToolsOpen(false);
     } catch (error) {
       console.error("Failed to clear cache:", error);
       alert("Failed to clear cache");
@@ -64,6 +71,7 @@ export default function Header() {
           `Persistent: ${status.persistent} DATs\n` +
           `Storage Size: ${status.totalSize}`,
       );
+      setDevToolsOpen(false);
     } catch (error) {
       console.error("Failed to get cache status:", error);
       alert("Failed to get cache status");
@@ -131,49 +139,79 @@ export default function Header() {
             </a>
           </Button>
 
-          {/* Developer Tools Dropdown */}
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <button className="hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md p-0 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50">
+          {/* Developer Tools Popover */}
+          <Popover open={devToolsOpen} onOpenChange={setDevToolsOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 cursor-pointer p-0"
+              >
                 <Settings className="h-4 w-4" />
                 <span className="sr-only">Developer tools</span>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleShowCacheStatus}>
-                <span className="block w-full cursor-pointer">
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-1" align="end">
+              <div className="flex flex-col space-y-1">
+                <Button
+                  variant="ghost"
+                  className="justify-start"
+                  onClick={handleShowCacheStatus}
+                >
                   Cache Status
-                </span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleClearCache}>
-                <span className="block w-full cursor-pointer">
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="justify-start"
+                  onClick={handleClearCache}
+                >
                   Clear DAT Cache
-                </span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
 
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild className="md:hidden">
-              <button className="hover:bg-accent hover:text-accent-foreground focus-visible:ring-ring inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md p-0 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50">
+          <Popover open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <PopoverTrigger asChild className="md:hidden">
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-expanded={mobileMenuOpen}
+                className="h-9 w-9 cursor-pointer p-0"
+              >
                 <Menu className="h-4 w-4" />
                 <span className="sr-only">Toggle menu</span>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleScrollTo("features")}>
-                <span className="block w-full cursor-pointer">Features</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleScrollTo("upload")}>
-                <span className="block w-full cursor-pointer">Upload</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <a href="/about/" className="block w-full">
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-1" align="end">
+              <div className="flex flex-col space-y-1">
+                <Button
+                  variant="ghost"
+                  className="justify-start"
+                  onClick={() => handleScrollTo("features")}
+                >
+                  Features
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="justify-start"
+                  onClick={() => handleScrollTo("upload")}
+                >
+                  Upload
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="justify-start"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    window.location.href = "/about/";
+                  }}
+                >
                   About
-                </a>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </header>
