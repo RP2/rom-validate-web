@@ -132,13 +132,13 @@ export default function Header() {
           </Button>
 
           {/* Developer Tools Dropdown */}
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-9 w-9 cursor-pointer touch-manipulation p-0"
-                style={{ touchAction: "manipulation" }}
+                className="h-9 w-9 cursor-pointer p-0"
+                onPointerDown={(e) => e.stopPropagation()}
               >
                 <Settings className="h-4 w-4" />
                 <span className="sr-only">Developer tools</span>
@@ -160,13 +160,13 @@ export default function Header() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild className="md:hidden">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-9 w-9 cursor-pointer touch-manipulation p-0"
-                style={{ touchAction: "manipulation" }}
+                className="h-9 w-9 cursor-pointer p-0"
+                onPointerDown={(e) => e.stopPropagation()}
               >
                 <Menu className="h-4 w-4" />
                 <span className="sr-only">Toggle menu</span>
