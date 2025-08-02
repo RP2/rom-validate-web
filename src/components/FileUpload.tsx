@@ -455,8 +455,8 @@ export default function FileUpload() {
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
           <strong>DAT Sources:</strong> This validator uses encrypted Nintendo
-          DS DATs (bundled locally) and dynamically fetches public DATs from the
-          Libretro database for other platforms.
+          DS DATs (bundled locally) and dynamically fetches No-Intro and Redump
+          DATs from Libretro's repository for other platforms.
           <strong>Privacy:</strong> Files are always processed locally, they are
           never sent anywhere.
         </AlertDescription>

@@ -188,9 +188,9 @@ export default function ValidationSettings() {
           <Alert className="mt-4">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              DAT files are downloaded from official No-Intro and Libretro
-              database sources. Large files may take several minutes to download
-              and process.
+              DAT files are downloaded from official No-Intro and Redump
+              databases via Libretro's repository. Large files may take several
+              minutes to download and process.
             </AlertDescription>
           </Alert>
         </CardContent>

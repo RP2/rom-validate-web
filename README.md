@@ -1,6 +1,6 @@
 # ROM Validator Web Frontend
 
-A modern web application for validating ROM files using No-Intro and Libretro database DAT files. This frontend provides similar functionality as the [CLI version](https://github.com/RP2/auto-rom-validator) with a user-friendly web interface.
+A modern web application for validating ROM files using No-Intro and Redump database DAT files. This frontend provides similar functionality as the [CLI version](https://github.com/RP2/auto-rom-validator) with a user-friendly web interface.
 
 ## ✨ Features
 
@@ -37,7 +37,7 @@ This project uses the same configuration as the CLI version for maximum compatib
 
 ### DAT Sources
 
-- **Public DATs**: Fetched from Libretro database in ClrMamePro format (`https://raw.githubusercontent.com/libretro/libretro-database/master/`)
+- **Public DATs**: No-Intro and Redump DATs fetched from Libretro's GitHub repository in ClrMamePro format (`https://raw.githubusercontent.com/libretro/libretro-database/master/`)
 - **Encrypted DATs**: Bundled locally in XML format for special access content (Nintendo DS Encrypted)
 - **Format Support**: Automatic detection and parsing of both XML and ClrMamePro DAT formats
 
@@ -253,4 +253,6 @@ This project maintains compatibility with the [CLI version](https://github.com/R
 ## 🔗 Related Projects
 
 - [CLI ROM Validator](https://github.com/RP2/auto-rom-validator) - Command-line version
-- [Libretro Database](https://github.com/libretro/libretro-database) - DAT file source
+- [No-Intro](https://no-intro.org/) - Cartridge-based ROM preservation database
+- [Redump](http://redump.org/) - Optical disc preservation database
+- [Libretro Database](https://github.com/libretro/libretro-database) - Repository hosting No-Intro and Redump DAT files
