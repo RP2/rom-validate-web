@@ -53,6 +53,9 @@ export default function Header() {
     try {
       const { clearDATCache } = await import("@/utils/datLoader");
       clearDATCache();
+
+      // Use console.log for mobile debugging and alert as fallback
+      console.log("DAT cache cleared successfully!");
       alert("DAT cache cleared successfully!");
       setDevToolsOpen(false);
     } catch (error) {
@@ -65,12 +68,15 @@ export default function Header() {
     try {
       const { getCacheStatus } = await import("@/utils/datLoader");
       const status = getCacheStatus();
-      alert(
+      const message =
         `Cache Status:\n` +
-          `Memory: ${status.memory} DATs\n` +
-          `Persistent: ${status.persistent} DATs\n` +
-          `Storage Size: ${status.totalSize}`,
-      );
+        `Memory: ${status.memory} DATs\n` +
+        `Persistent: ${status.persistent} DATs\n` +
+        `Storage Size: ${status.totalSize}`;
+
+      // Use console.log for mobile debugging and alert as fallback
+      console.log(message);
+      alert(message);
       setDevToolsOpen(false);
     } catch (error) {
       console.error("Failed to get cache status:", error);
@@ -155,14 +161,14 @@ export default function Header() {
               <div className="flex flex-col space-y-1">
                 <Button
                   variant="ghost"
-                  className="justify-start"
+                  className="cursor-pointer touch-manipulation justify-start"
                   onClick={handleShowCacheStatus}
                 >
                   Cache Status
                 </Button>
                 <Button
                   variant="ghost"
-                  className="justify-start"
+                  className="cursor-pointer touch-manipulation justify-start"
                   onClick={handleClearCache}
                 >
                   Clear DAT Cache

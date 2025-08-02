@@ -16,20 +16,37 @@ A modern web application for validating ROM files using No-Intro and Redump data
 
 ## 🎮 Supported Platforms
 
-### Nintendo Platforms (No-Intro DATs)
+### Nintendo Handheld Platforms (No-Intro DATs)
 
-- Game Boy / Game Boy Color / Game Boy Advance
-- Nintendo DS / Nintendo DSi / Nintendo 3DS
-- Nintendo 64 / Super Nintendo / Nintendo Entertainment System
+- **Game Boy** (.gb)
+- **Game Boy Color** (.gbc)
+- **Game Boy Advance** (.gba)
+- **Nintendo DS** (.nds)
+- **Nintendo DS Download Play** (.nds)
+- **Nintendo DSi** (.nds)
+- **Nintendo 3DS** (.3ds)
 
-### Sony Platforms (Redump DATs)
+### Nintendo Console Platforms (No-Intro DATs)
 
-- PlayStation / PlayStation 2
-- PlayStation Portable (PSP)
+- **Nintendo Entertainment System** (.nes)
+- **Super Nintendo Entertainment System** (.smc, .sfc)
+- **Nintendo 64** (.n64, .z64)
 
 ### Nintendo Disc Platforms (Redump DATs)
 
-- GameCube / Wii
+- **GameCube** (.iso, .gcm, .ciso)
+- **Wii** (.iso, .wbfs)
+
+### Sony Platforms
+
+- **PlayStation** (.bin/.cue) - Redump DATs
+- **PlayStation 2** (.iso, .bin/.cue) - Redump DATs
+- **PlayStation Portable (PSP)** (.iso, .cso, .pbp) - No-Intro DATs
+
+### Sega Platforms
+
+- **Sega Genesis / Mega Drive** (.md, .gen, .smd) - No-Intro DATs
+- **Sega Dreamcast** (.bin/.cue, .cdi, .gdi) - Redump DATs
 
 ## 🔧 DAT File Configuration
 
@@ -125,7 +142,7 @@ All commands are run from the root of the project:
 | `npm run astro -- --help` | Get help using the Astro CLI                     |
 | `npm run format`          | Format all project files with prettier           |
 
-## �️ Development
+## 🛠️ Development
 
 ### Prerequisites
 
