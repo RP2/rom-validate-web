@@ -75,7 +75,7 @@ export default function Header() {
       <div className="container mx-auto flex h-16 items-center px-4">
         {/* Left side - Logo */}
         <div className="flex items-center space-x-2">
-          <div className="bg-primary flex h-8 w-8 items-center justify-center rounded-md">
+          <div className="bg-primary hidden h-8 w-8 items-center justify-center rounded-md sm:flex">
             <span className="text-primary-foreground text-xs font-bold">
               ARV
             </span>
