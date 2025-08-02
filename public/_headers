@@ -1,0 +1,10 @@
+# Development domains - prevent indexing
+https://rom-validate-web.pages.dev/*
+  X-Robots-Tag: noindex, nofollow, noarchive, nosnippet
+
+# Additional security headers for all domains
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  X-XSS-Protection: 1; mode=block
+  Referrer-Policy: strict-origin-when-cross-origin

@@ -11,4 +11,5 @@ export default defineConfig({
   site: "https://arv.rileyperalta.com",
   vite: { plugins: [tailwindcss()] },
   integrations: [react(), sitemap()],
+  trailingSlash: "always",
 });

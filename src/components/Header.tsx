@@ -21,8 +21,9 @@ export default function Header() {
   };
 
   const handleScrollTo = (elementId: string) => {
-    // Check if we're on the home page
-    if (window.location.pathname !== "/") {
+    // Check if we're on the home page (handle both / and trailing slash cases)
+    const currentPath = window.location.pathname;
+    if (currentPath !== "/" && currentPath !== "") {
       // Navigate to home page with hash
       window.location.href = `/#${elementId}`;
       return;
@@ -99,7 +100,7 @@ export default function Header() {
             Upload
           </button>
           <a
-            href="/about"
+            href="/about/"
             className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
           >
             About
@@ -163,7 +164,7 @@ export default function Header() {
                 Upload
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <a href="/about">About</a>
+                <a href="/about/">About</a>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleShowCacheStatus}>
