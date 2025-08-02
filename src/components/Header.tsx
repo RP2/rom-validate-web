@@ -76,12 +76,12 @@ export default function Header() {
         {/* Left side - Logo */}
         <div className="flex items-center space-x-2">
           <div className="bg-primary flex h-8 w-8 items-center justify-center rounded-md">
-            <span className="text-primary-foreground text-sm font-bold">
-              RV
+            <span className="text-primary-foreground text-xs font-bold">
+              ARV
             </span>
           </div>
           <a className="text-lg font-bold hover:underline" href="/">
-            ROM Validator
+            Auto ROM Validator
           </a>
         </div>
 

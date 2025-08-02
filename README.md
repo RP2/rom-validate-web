@@ -1,4 +1,4 @@
-# ROM Validator Web Frontend
+# Auto ROM Validator Web Frontend
 
 A modern web application for validating ROM files using No-Intro and Redump database DAT files. This frontend provides similar functionality as the [CLI version](https://github.com/RP2/auto-rom-validator) with a user-friendly web interface.
 
