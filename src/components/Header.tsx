@@ -89,13 +89,13 @@ export default function Header() {
         <nav className="absolute left-1/2 hidden -translate-x-1/2 transform items-center space-x-6 md:flex">
           <button
             onClick={() => handleScrollTo("features")}
-            className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+            className="text-muted-foreground hover:text-foreground cursor-pointer text-sm font-medium transition-colors"
           >
             Features
           </button>
           <button
             onClick={() => handleScrollTo("upload")}
-            className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+            className="text-muted-foreground hover:text-foreground cursor-pointer text-sm font-medium transition-colors"
           >
             Upload
           </button>
@@ -113,7 +113,7 @@ export default function Header() {
             variant="ghost"
             size="sm"
             onClick={toggleTheme}
-            className="h-9 w-9 p-0"
+            className="h-9 w-9 cursor-pointer p-0"
           >
             <Sun className="h-4 w-4 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
             <Moon className="absolute h-4 w-4 scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
@@ -137,7 +137,7 @@ export default function Header() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-9 w-9 touch-manipulation p-0"
+                className="h-9 w-9 cursor-pointer touch-manipulation p-0"
                 style={{ touchAction: "manipulation" }}
               >
                 <Settings className="h-4 w-4" />
@@ -145,10 +145,16 @@ export default function Header() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleShowCacheStatus}>
+              <DropdownMenuItem
+                onClick={handleShowCacheStatus}
+                className="cursor-pointer"
+              >
                 Cache Status
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleClearCache}>
+              <DropdownMenuItem
+                onClick={handleClearCache}
+                className="cursor-pointer"
+              >
                 Clear DAT Cache
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -159,7 +165,7 @@ export default function Header() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-9 w-9 touch-manipulation p-0"
+                className="h-9 w-9 cursor-pointer touch-manipulation p-0"
                 style={{ touchAction: "manipulation" }}
               >
                 <Menu className="h-4 w-4" />
@@ -168,13 +174,15 @@ export default function Header() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => handleScrollTo("features")}>
-                Features
+                <span className="cursor-pointer">Features</span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleScrollTo("upload")}>
-                Upload
+                <span className="cursor-pointer">Upload</span>
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <a href="/about/">About</a>
+                <a href="/about/" className="cursor-pointer">
+                  About
+                </a>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
