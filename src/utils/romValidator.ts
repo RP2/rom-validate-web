@@ -63,9 +63,10 @@ function crc32(data: Uint8Array): string {
   return ((crc ^ 0xffffffff) >>> 0).toString(16).toUpperCase().padStart(8, "0");
 }
 
-// Calculate file hashes client-side
+// Calculate file hashes client-side with progress tracking
 export async function calculateFileHashes(
   file: File,
+  onProgress?: (progress: number) => void,
 ): Promise<{ md5: string; sha1: string; crc32: string }> {
   const buffer = await file.arrayBuffer();
   const data = new Uint8Array(buffer);
@@ -73,14 +74,18 @@ export async function calculateFileHashes(
   let md5 = "";
   let sha1 = "";
 
+  onProgress?.(10); // Starting hash calculation
+
   try {
     // Try to calculate SHA-1 (widely supported)
     const sha1Hash = await crypto.subtle.digest("SHA-1", buffer);
     const sha1Array = Array.from(new Uint8Array(sha1Hash));
     sha1 = sha1Array.map((b) => b.toString(16).padStart(2, "0")).join("");
+    onProgress?.(40); // SHA-1 complete
   } catch (error) {
     console.warn("SHA-1 calculation failed:", error);
     sha1 = "unavailable";
+    onProgress?.(40);
   }
 
   try {
@@ -88,14 +93,17 @@ export async function calculateFileHashes(
     const md5Hash = await crypto.subtle.digest("MD5", buffer);
     const md5Array = Array.from(new Uint8Array(md5Hash));
     md5 = md5Array.map((b) => b.toString(16).padStart(2, "0")).join("");
+    onProgress?.(70); // MD5 complete
   } catch (error) {
     console.warn("MD5 not supported in this browser, using fallback:", error);
     // Fallback: use a simplified hash or mark as unavailable
     md5 = simpleMD5(data);
+    onProgress?.(70);
   }
 
   // Calculate CRC32 (always available since it's our implementation)
   const crc32Hash = crc32(data);
+  onProgress?.(90); // CRC32 complete
 
   return { md5, sha1, crc32: crc32Hash };
 }
@@ -627,7 +635,13 @@ export async function loadDATFiles(): Promise<DATEntry[]> {
 // Process multiple files
 export async function validateROMs(
   files: File[],
-  onProgress?: (current: number, total: number, currentFile: string) => void,
+  onProgress?: (
+    current: number,
+    total: number,
+    currentFile: string,
+    stage: "hashing" | "loading-dats" | "validating",
+    fileProgress?: number,
+  ) => void,
   forcePlatform?: string,
 ): Promise<ValidationResult[]> {
   const results: ValidationResult[] = [];
@@ -641,15 +655,30 @@ export async function validateROMs(
   for (let i = 0; i < validFiles.length; i++) {
     const file = validFiles[i];
 
-    onProgress?.(i + 1, validFiles.length, file.name);
+    // Start hashing stage
+    onProgress?.(i + 1, validFiles.length, file.name, "hashing", 0);
 
-    const hashes = await calculateFileHashes(file);
+    const hashes = await calculateFileHashes(file, (hashProgress) => {
+      onProgress?.(
+        i + 1,
+        validFiles.length,
+        file.name,
+        "hashing",
+        hashProgress,
+      );
+    });
+
+    // Loading DATs stage
+    onProgress?.(i + 1, validFiles.length, file.name, "loading-dats", 100);
 
     // Get platform-specific DAT entries based on file extension (CLI-style)
     const { getPlatformsForFile, loadPlatformDAT } = await import(
       "./datLoader"
     );
     const platforms = getPlatformsForFile(file.name);
+
+    // Validation stage
+    onProgress?.(i + 1, validFiles.length, file.name, "validating", 0);
 
     let result: ValidationResult;
 
@@ -870,6 +899,9 @@ export async function validateROMs(
     }
 
     results.push(result);
+
+    // File validation complete
+    onProgress?.(i + 1, validFiles.length, file.name, "validating", 100);
   }
 
   return results;

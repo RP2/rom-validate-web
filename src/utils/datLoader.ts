@@ -172,12 +172,14 @@ export async function loadBundledDAT(platform: string): Promise<DATEntry[]> {
 
   // Check memory cache first
   if (datCache.has(memoryKey)) {
+    console.log(`📦 Using cached bundled DAT for ${platform} (memory)`);
     return datCache.get(memoryKey)!;
   }
 
   // Check persistent cache
   const cachedEntries = loadFromPersistentCache(platform, "bundled");
   if (cachedEntries) {
+    console.log(`📦 Using cached bundled DAT for ${platform} (localStorage)`);
     datCache.set(memoryKey, cachedEntries);
     return cachedEntries;
   }
@@ -194,7 +196,7 @@ export async function loadBundledDAT(platform: string): Promise<DATEntry[]> {
 
     const entries = parseDAT(datContent, platform);
     console.log(
-      `📦 Loaded bundled DAT for ${platform}: ${entries.length} entries`,
+      `📦 Loaded bundled DAT for ${platform}: ${entries.length} entries (fresh fetch)`,
     );
 
     // Cache in both memory and persistent storage
@@ -214,12 +216,14 @@ export async function loadLibretroDAT(platform: string): Promise<DATEntry[]> {
 
   // Check memory cache first
   if (datCache.has(memoryKey)) {
+    console.log(`🌐 Using cached Libretro DAT for ${platform} (memory)`);
     return datCache.get(memoryKey)!;
   }
 
   // Check persistent cache
   const cachedEntries = loadFromPersistentCache(platform, "libretro");
   if (cachedEntries) {
+    console.log(`🌐 Using cached Libretro DAT for ${platform} (localStorage)`);
     datCache.set(memoryKey, cachedEntries);
     return cachedEntries;
   }
@@ -247,7 +251,7 @@ export async function loadLibretroDAT(platform: string): Promise<DATEntry[]> {
     const datContent = await response.text();
     const entries = parseDAT(datContent, platform);
     console.log(
-      `🌐 Downloaded Libretro DAT for ${platform}: ${entries.length} entries`,
+      `🌐 Downloaded Libretro DAT for ${platform}: ${entries.length} entries (fresh download)`,
     );
 
     // Cache in both memory and persistent storage

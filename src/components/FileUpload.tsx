@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { validateROMs, type ValidationResult } from "@/utils/romValidator";
 import { getSupportedPlatforms } from "@/utils/datLoader";
+import ValidationProgress from "./ValidationProgress";
 
 interface UploadedFile {
   file: File;
@@ -34,6 +35,21 @@ interface UploadedFile {
   status: "pending" | "processing" | "completed" | "error";
   progress: number;
   error?: string;
+  platform?: string;
+  timeStarted?: number;
+}
+
+interface ValidationStats {
+  totalFiles: number;
+  processedFiles: number;
+  currentFile?: string;
+  currentStage:
+    | "initializing"
+    | "hashing"
+    | "loading-dats"
+    | "validating"
+    | "completed";
+  timeStarted: number;
 }
 
 declare global {
@@ -48,11 +64,38 @@ export default function FileUpload() {
   const [isValidating, setIsValidating] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState<string>("auto");
   const [supportedPlatforms, setSupportedPlatforms] = useState<string[]>([]);
+  const [validationStats, setValidationStats] =
+    useState<ValidationStats | null>(null);
+  const [showProgress, setShowProgress] = useState(false);
 
   // Load supported platforms on component mount
   useEffect(() => {
     const platforms = getSupportedPlatforms();
     setSupportedPlatforms(platforms.sort());
+  }, []);
+
+  // Listen for clear progress event from results component
+  useEffect(() => {
+    const handleClearProgress = () => {
+      setShowProgress(false);
+      setValidationStats(null);
+      setIsValidating(false);
+      // Reset file statuses to pending but keep the files
+      setFiles((prev) =>
+        prev.map((f) => ({
+          ...f,
+          status: "pending" as const,
+          progress: 0,
+          timeStarted: undefined,
+        })),
+      );
+    };
+
+    window.addEventListener("clearProgress", handleClearProgress);
+
+    return () => {
+      window.removeEventListener("clearProgress", handleClearProgress);
+    };
   }, []);
 
   // Prevent default browser behavior for drag and drop
@@ -228,10 +271,50 @@ export default function FileUpload() {
     }));
 
     setFiles((prev) => [...prev, ...fileObjects]);
+
+    // Scroll to file list after a short delay to ensure DOM is updated
+    setTimeout(() => {
+      const fileListElement = document.getElementById("file-list-section");
+      if (fileListElement) {
+        fileListElement.scrollIntoView({
+          behavior: "smooth",
+          block: "end",
+        });
+      }
+    }, 100);
   };
 
   const removeFile = (id: string) => {
-    setFiles((prev) => prev.filter((f) => f.id !== id));
+    setFiles((prev) => {
+      const newFiles = prev.filter((f) => f.id !== id);
+      // Only hide progress if no files remain AND validation is not completed
+      if (newFiles.length === 0) {
+        setShowProgress(false);
+        setValidationStats(null);
+        // Also clear results if no files remain
+        if (window.validationResults) {
+          delete window.validationResults;
+        }
+      } else {
+        // Update validation stats to reflect the new file count
+        setValidationStats((prevStats) => {
+          if (prevStats) {
+            const removedFile = prev.find((f) => f.id === id);
+            const wasCompleted = removedFile?.status === "completed";
+
+            return {
+              ...prevStats,
+              totalFiles: newFiles.length,
+              processedFiles: wasCompleted
+                ? Math.max(0, prevStats.processedFiles - 1)
+                : prevStats.processedFiles,
+            };
+          }
+          return prevStats;
+        });
+      }
+      return newFiles;
+    });
   };
 
   const formatFileSize = (bytes: number) => {
@@ -242,27 +325,90 @@ export default function FileUpload() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
+  const cancelValidation = () => {
+    setIsValidating(false);
+    setShowProgress(false);
+    setValidationStats(null);
+    // Reset file statuses but keep the files
+    setFiles((prev) =>
+      prev.map((f) => ({
+        ...f,
+        status: "pending" as const,
+        progress: 0,
+        timeStarted: undefined,
+      })),
+    );
+  };
+
+  const clearAllFiles = () => {
+    setFiles([]);
+    // If no files remain, also hide progress
+    setShowProgress(false);
+    setValidationStats(null);
+  };
+
   const startValidation = async () => {
     if (files.length === 0) return;
 
     setIsValidating(true);
+    setShowProgress(true);
+
+    // Initialize validation stats
+    const startTime = Date.now();
+    setValidationStats({
+      totalFiles: files.length,
+      processedFiles: 0,
+      currentStage: "initializing",
+      timeStarted: startTime,
+    });
 
     try {
       // Process files locally using the ROM validator
       const fileList = files.map((f) => f.file);
 
+      // Set stage to hashing
+      setValidationStats((prev) =>
+        prev ? { ...prev, currentStage: "hashing" } : null,
+      );
+
       const results = await validateROMs(
         fileList,
-        (current, total, currentFileName) => {
+        (current, total, currentFileName, stage, fileProgress = 0) => {
           // Update progress for the current file being processed
           const currentIndex = files.findIndex(
             (f) => f.file.name === currentFileName,
           );
 
+          // Update validation stats
+          setValidationStats((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  processedFiles: current - 1,
+                  currentFile: currentFileName,
+                  currentStage: stage,
+                }
+              : null,
+          );
+
           setFiles((prev) =>
             prev.map((f, index) => {
               if (index === currentIndex) {
-                return { ...f, status: "processing", progress: 50 };
+                const status =
+                  stage === "hashing"
+                    ? "processing"
+                    : stage === "loading-dats"
+                      ? "processing"
+                      : stage === "validating"
+                        ? "processing"
+                        : "processing";
+
+                return {
+                  ...f,
+                  status,
+                  progress: fileProgress,
+                  timeStarted: f.timeStarted || Date.now(),
+                };
               } else if (index < currentIndex) {
                 return { ...f, status: "completed", progress: 100 };
               }
@@ -278,12 +424,24 @@ export default function FileUpload() {
         prev.map((f) => ({ ...f, status: "completed", progress: 100 })),
       );
 
+      // Update final stats
+      setValidationStats((prev) =>
+        prev
+          ? {
+              ...prev,
+              processedFiles: files.length,
+              currentStage: "completed",
+              currentFile: undefined,
+            }
+          : null,
+      );
+
       // Store results globally for the results component to access
       window.validationResults = results;
 
-      // Show results section
+      // Show results section but keep progress visible
       setTimeout(() => {
-        setIsValidating(false);
+        setIsValidating(false); // Stop validation but keep progress visible
         const resultsSection = document.getElementById("results-section");
         if (resultsSection) {
           resultsSection.classList.remove("hidden");
@@ -293,6 +451,8 @@ export default function FileUpload() {
     } catch (error) {
       console.error("Validation error:", error);
       setIsValidating(false);
+      setShowProgress(false);
+      setValidationStats(null);
 
       // Show more detailed error information
       const errorMessage =
@@ -447,7 +607,7 @@ export default function FileUpload() {
 
       {/* File List */}
       {files.length > 0 && (
-        <Card>
+        <Card id="file-list-section">
           <CardHeader>
             <CardTitle>Selected Files ({files.length})</CardTitle>
             <CardDescription>
@@ -455,7 +615,7 @@ export default function FileUpload() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-3 overflow-hidden">
               {files.map((uploadedFile) => (
                 <div
                   key={uploadedFile.id}
@@ -502,7 +662,7 @@ export default function FileUpload() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => setFiles([])}
+                onClick={clearAllFiles}
                 disabled={isValidating}
               >
                 Clear All
@@ -512,39 +672,34 @@ export default function FileUpload() {
         </Card>
       )}
 
-      {/* Validation Progress */}
-      {isValidating && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="text-primary h-5 w-5" />
-                <span className="text-sm font-medium">
-                  Validating ROM files...
-                </span>
-              </div>
-              <Progress
-                value={
-                  files.length > 0
-                    ? (files.filter((f) => f.status === "completed").length /
-                        files.length) *
-                      100
-                    : 0
-                }
-                className="h-2"
-              />
-              <p className="text-muted-foreground text-xs">
-                Processing{" "}
-                {files.filter((f) => f.status === "completed").length +
-                  (files.filter((f) => f.status === "processing").length > 0
-                    ? 1
-                    : 0)}{" "}
-                of {files.length} files • Downloading DAT files • Calculating
-                hashes
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Enhanced Validation Progress */}
+      {showProgress && validationStats && (
+        <ValidationProgress
+          files={files.map((f) => ({
+            id: f.id,
+            name: f.file.name,
+            status:
+              f.status === "processing"
+                ? validationStats?.currentStage === "hashing"
+                  ? "hashing"
+                  : validationStats?.currentStage === "loading-dats"
+                    ? "validating"
+                    : validationStats?.currentStage === "validating"
+                      ? "validating"
+                      : "validating"
+                : f.status === "completed"
+                  ? "completed"
+                  : f.status === "error"
+                    ? "error"
+                    : "pending",
+            progress: f.progress,
+            size: f.file.size,
+            platform: f.platform,
+            timeStarted: f.timeStarted,
+          }))}
+          stats={validationStats}
+          onCancel={cancelValidation}
+        />
       )}
 
       {/* Info Alert */}

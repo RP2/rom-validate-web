@@ -115,11 +115,11 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
                 1
               </div>
               <div>
-                <h4 class="mb-1 font-semibold">Upload Your Files</h4>
+                <h4 class="mb-1 font-semibold">Enhanced Progress Tracking</h4>
                 <p class="text-muted-foreground text-sm">
-                  Select ROM files from your computer with drag & drop or file
-                  browser. Optionally choose a specific platform for faster
-                  validation.
+                  Real-time file-by-file progress with detailed stages, time
+                  estimates, and persistent display throughout the validation
+                  workflow.
                 </p>
               </div>
             </div>
@@ -129,6 +129,22 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
                 class="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
               >
                 2
+              </div>
+              <div>
+                <h4 class="mb-1 font-semibold">Upload Your Files</h4>
+                <p class="text-muted-foreground text-sm">
+                  Select ROM files with drag & drop or file browser. Auto-scroll
+                  navigation keeps relevant content visible during upload and
+                  validation.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-4">
+              <div
+                class="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
+              >
+                3
               </div>
               <div>
                 <h4 class="mb-1 font-semibold">Smart Platform Detection</h4>
@@ -144,28 +160,13 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
               <div
                 class="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
               >
-                3
+                4
               </div>
               <div>
                 <h4 class="mb-1 font-semibold">Hash Calculation</h4>
                 <p class="text-muted-foreground text-sm">
-                  The app calculates MD5, SHA-1, and CRC32 hashes of your files
-                  to uniquely identify them with full hash transparency.
-                </p>
-              </div>
-            </div>
-
-            <div class="flex items-start gap-4">
-              <div
-                class="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
-              >
-                4
-              </div>
-              <div>
-                <h4 class="mb-1 font-semibold">DAT Comparison</h4>
-                <p class="text-muted-foreground text-sm">
-                  Hashes are compared against official DAT databases with smart
-                  caching and automatic fallback for comprehensive validation.
+                  Calculates MD5, SHA-1, and CRC32 hashes with full transparency
+                  and copy-to-clipboard functionality for easy verification.
                 </p>
               </div>
             </div>
@@ -177,10 +178,11 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
                 5
               </div>
               <div>
-                <h4 class="mb-1 font-semibold">Results & Export</h4>
+                <h4 class="mb-1 font-semibold">DAT Comparison</h4>
                 <p class="text-muted-foreground text-sm">
-                  Get detailed validation results with filtering, file details,
-                  renaming suggestions, and comprehensive export options.
+                  Compares against official DAT databases with transparent
+                  caching (shows cache vs fresh download), smart fallback, and
+                  automatic cleanup.
                 </p>
               </div>
             </div>
@@ -196,6 +198,19 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
         <CardContent>
           <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div class="space-y-4">
+              <h4 class="font-semibold">Enhanced User Experience</h4>
+              <ul class="text-muted-foreground space-y-2 text-sm">
+                <li>• Granular progress tracking with file-by-file status</li>
+                <li>• Persistent progress display throughout validation</li>
+                <li>
+                  • Smart clear functions (all files, progress only, results)
+                </li>
+                <li>• Auto-scroll navigation for optimal workflow</li>
+                <li>• Consistent visual theming with responsive design</li>
+              </ul>
+            </div>
+
+            <div class="space-y-4">
               <h4 class="font-semibold">Platform Selection & Detection</h4>
               <ul class="text-muted-foreground space-y-2 text-sm">
                 <li>• Manual platform override for faster validation</li>
@@ -210,30 +225,35 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
             <div class="space-y-4">
               <h4 class="font-semibold">DAT Management & Caching</h4>
               <ul class="text-muted-foreground space-y-2 text-sm">
-                <li>• Multi-level caching with 24-hour expiry</li>
-                <li>• Custom DAT upload support</li>
-                <li>• DAT browser with search functionality</li>
-                <li>• Memory-first bundled DAT loading</li>
+                <li>• Multi-level caching with transparent status reporting</li>
+                <li>• Clear console logging (cached vs fresh downloads)</li>
+                <li>• Custom DAT upload support with persistent storage</li>
+                <li>• DAT browser with accordion interface and search</li>
+                <li>• Memory-first bundled DAT loading for performance</li>
               </ul>
             </div>
 
             <div class="space-y-4">
               <h4 class="font-semibold">Developer Tools</h4>
               <ul class="text-muted-foreground space-y-2 text-sm">
-                <li>• Cache status monitoring with size tracking</li>
-                <li>• Browse cached DATs in formatted viewer</li>
-                <li>• Clear cache with confirmation dialogs</li>
+                <li>• Real-time cache status with accurate size tracking</li>
+                <li>
+                  • Browse cached DATs in formatted viewer with accordions
+                </li>
+                <li>• Clear cache functions with confirmation dialogs</li>
                 <li>• Source identification (bundled/libretro/custom)</li>
+                <li>• Consistent UI for all DAT sources and types</li>
               </ul>
             </div>
 
             <div class="space-y-4">
               <h4 class="font-semibold">Results & Export</h4>
               <ul class="text-muted-foreground space-y-2 text-sm">
-                <li>• Status filtering (Valid, Unknown, Renamed, All)</li>
-                <li>• Detailed file information with platform/region data</li>
-                <li>• Hash transparency with copy-to-clipboard</li>
-                <li>• Comprehensive export options and reports</li>
+                <li>• Status filtering with smart clear button management</li>
+                <li>• Detailed file information with interactive modals</li>
+                <li>• Hash transparency with one-click copy-to-clipboard</li>
+                <li>• Comprehensive export options and validation reports</li>
+                <li>• Labeled clear buttons for intuitive workflow control</li>
               </ul>
             </div>
           </div>
@@ -251,8 +271,9 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
             <AlertDescription>
               Your ROM files never leave your computer. All processing happens
               locally in your browser - we only fetch public DAT files for
-              comparison and cache them intelligently with multi-level storage
-              (memory + 24-hour localStorage) to improve performance while
+              comparison and cache them intelligently with transparent reporting
+              (console logs show cached vs fresh downloads). Multi-level storage
+              (memory + 24-hour localStorage) improves performance while
               minimizing traffic. Custom DAT files you upload are also processed
               and stored entirely locally in your browser.
             </AlertDescription>
@@ -265,9 +286,11 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
               This site uses Cloudflare for content delivery but does not track
               users, store personal data, or use cookies. Only essential browser
               storage is used for DAT file caching (including your custom
-              uploads) and user preferences (theme, cache management). All cache
-              data includes automatic expiry and version control for optimal
-              performance.
+              uploads), user preferences (theme selection), and smart cache
+              management with transparent status reporting. Theme preferences
+              are stored locally on your device only and are never transmitted
+              to any server. All cache data includes automatic expiry and
+              version control for optimal performance.
             </AlertDescription>
           </Alert>
 

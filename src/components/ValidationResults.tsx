@@ -31,6 +31,7 @@ import {
   Copy,
   Calendar,
   Info,
+  X,
 } from "lucide-react";
 import type { ValidationResult } from "@/utils/romValidator";
 
@@ -328,6 +329,21 @@ export default function ValidationResults() {
     }
   };
 
+  const handleClearResults = () => {
+    // Clear global validation results
+    if (window.validationResults) {
+      delete window.validationResults;
+    }
+
+    // Clear local state
+    setResults([]);
+    setSummary(null);
+    setSelectedPlatform("all");
+    setSelectedStatus("all");
+
+    // Dispatch custom event to clear progress section only
+    window.dispatchEvent(new CustomEvent("clearProgress"));
+  };
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "valid":
@@ -504,7 +520,7 @@ export default function ValidationResults() {
           </div>
 
           {/* Results List */}
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-hidden">
             {filteredResults.map((result, index) => (
               <div
                 key={`${result.filename}-${index}`}
@@ -872,21 +888,31 @@ export default function ValidationResults() {
           </div>
 
           {/* Actions */}
-          <div className="border-border mt-6 flex gap-3 border-t pt-6">
-            <Button onClick={handleDownloadReport}>
-              <Download className="mr-2 h-4 w-4" />
-              Download Report
+          <div className="border-border mt-6 flex justify-between border-t pt-6">
+            <div className="flex gap-3">
+              <Button onClick={handleDownloadReport}>
+                <Download className="mr-2 h-4 w-4" />
+                Download Report
+              </Button>
+              {filesToRename.length > 0 && (
+                <Button variant="outline" onClick={handleApplyRenames}>
+                  Apply Renames (Download {filesToRename.length} Files)
+                </Button>
+              )}
+              {unknownFiles.length > 0 && (
+                <Button variant="outline" onClick={handleExportUnknownList}>
+                  Export Unknown List ({unknownFiles.length} Files)
+                </Button>
+              )}
+            </div>
+            <Button
+              variant="destructive"
+              onClick={handleClearResults}
+              className="hover:bg-destructive/90"
+            >
+              <X className="mr-2 h-4 w-4" />
+              Clear Results
             </Button>
-            {filesToRename.length > 0 && (
-              <Button variant="outline" onClick={handleApplyRenames}>
-                Apply Renames (Download {filesToRename.length} Files)
-              </Button>
-            )}
-            {unknownFiles.length > 0 && (
-              <Button variant="outline" onClick={handleExportUnknownList}>
-                Export Unknown List ({unknownFiles.length} Files)
-              </Button>
-            )}
           </div>
         </CardContent>
       </Card>

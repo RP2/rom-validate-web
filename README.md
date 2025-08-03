@@ -13,15 +13,19 @@ A modern web application for validating ROM files using No-Intro and Redump data
 - **Cross-Platform Validation**: Automatic PlayStation format fallback for edge cases
 - **Drag & Drop Interface**: Modern, responsive UI with shadcn/ui components
 - **Manual Platform Selection**: Optional platform override for faster validation when you know the target system
-- **Real-time Progress**: Live validation progress with detailed results
-- **Hash Transparency**: View calculated MD5, SHA-1, and CRC32 hashes for all processed files
-- **Detailed File Information**: Comprehensive file details including platform, region, and DAT source
+- **Enhanced Progress Tracking**: Granular real-time progress with file-by-file status, time estimates, and detailed validation stages
+- **Persistent Progress Display**: Progress indicator remains visible throughout validation workflow with smart state management
+- **Comprehensive Clear Functions**: Multiple clear options with specific behaviors for optimal workflow control
+- **Auto-Scroll Navigation**: Automatic scrolling to keep relevant content visible during file upload and validation
+- **Improved Visual Consistency**: Unified theming using shadcn color tokens with proper hover states and responsive design
+- **Hash Transparency**: View calculated MD5, SHA-1, and CRC32 hashes for all processed files with copy-to-clipboard functionality
+- **Detailed File Information**: Comprehensive file details including platform, region, and DAT source with interactive modals
 - **DAT Source Links**: Clickable badges linking to No-Intro and Redump official websites
-- **Mobile-Responsive Design**: Optimized interface for desktop and mobile devices
-- **DAT Browser**: Browse and search cached DAT files with built-in viewer
+- **Mobile-Responsive Design**: Optimized interface for desktop and mobile devices with touch-friendly interactions
+- **DAT Browser**: Browse and search cached DAT files with built-in viewer and accordion interface
 - **Custom DAT Upload**: Upload and use your own DAT files alongside official databases
-- **Advanced Cache Management**: Intelligent memory vs persistent storage with developer tools
-- **Developer Tools**: Comprehensive cache status, browsing, and management interface
+- **Advanced Cache Management**: Intelligent memory vs persistent storage with transparent cache status reporting
+- **Developer Tools**: Comprehensive cache status, browsing, and management interface with clear source identification
 
 ## 🎮 Supported Platforms
 
@@ -202,7 +206,8 @@ EXTENSION_MAP = {
 - **Complete Privacy**: All file processing happens locally in your browser - files never leave your computer
 - **No File Upload**: ROM files are never sent to any server
 - **Custom DATs Stay Local**: Uploaded custom DAT files are processed and cached entirely in your browser's local storage - never transmitted to any server
-- **No Data Collection**: No user tracking, personal data storage, or cookies beyond essential DAT caching
+- **No Data Collection**: No user tracking, personal data storage, or cookies beyond essential DAT caching and theme preferences
+- **Local Theme Storage**: Theme preferences (light/dark/system) are stored locally on your device only and never transmitted to any server
 - **Smart Caching**: DAT files cached locally with 24-hour expiry to minimize external requests
 - **Cache Management**: Built-in cache status and cleanup tools in developer settings
 - **Browser Compatibility**: Graceful fallback for browsers with limited crypto support
@@ -227,7 +232,19 @@ EXTENSION_MAP = {
 - **Smart Recommendations**: UI guides users on when to use manual vs automatic detection
 - **Batch Optimization**: Perfect for validating collections from known platforms
 
-### Validation Results Display
+### Enhanced User Experience Features
+
+- **Granular Progress Tracking**: Real-time file-by-file validation progress with detailed stages (initializing, hashing, loading DATs, validating, completed)
+- **Persistent Progress Display**: Progress indicator remains visible throughout the entire validation workflow for better user experience
+- **Smart State Management**: Comprehensive clear functions with specific behaviors (clear all files, clear progress only, clear results)
+- **Auto-Scroll Navigation**: Automatic scrolling to keep relevant sections visible during file upload and validation completion
+- **Comprehensive Clear Options**: Multiple clear buttons with distinct functions:
+  - **Clear All**: Removes uploaded files and resets all state
+  - **Clear Progress**: Resets validation progress while keeping uploaded files
+  - **Clear Results**: Removes validation results with labeled button for clarity
+- **Enhanced Visual Feedback**: Consistent theming using shadcn design tokens with proper hover states and responsive behavior
+- **Optimized Animations**: Smooth transitions with proper overflow handling to prevent horizontal scrollbars during progress updates
+- **Time Estimation**: Real-time validation time tracking with estimated completion times for better user planning
 
 - **Status Filtering**: Filter results by validation status (Valid, Unknown, Renamed, All)
 - **Interactive File Details**: Click the eye icon to view comprehensive file information including:
@@ -244,7 +261,7 @@ EXTENSION_MAP = {
 - **Copy to Clipboard**: One-click copying of individual hash values (CRC32, MD5, SHA-1)
 - **Mobile-Optimized**: Responsive design with touch-friendly buttons and proper text wrapping
 
-### Export and Actions
+### Validation Results Display
 
 - **Comprehensive Reports**: Download detailed validation reports in text format
 - **Unknown ROM Lists**: Export lists of unidentified files with hashes for manual research
@@ -306,6 +323,7 @@ Access comprehensive DAT management via the settings icon (⚙️) in the header
 - **Consistent UX**: Bundled DATs appear in browse interface when user has other cached content
 - **Storage Efficiency**: Automatic cleanup of expired data with version control and cache validation
 - **Bandwidth Optimization**: Reduces repeated downloads by ~70% for common validations with intelligent caching
+- **Cache Transparency**: Clear console logging distinguishes between cached data usage and fresh downloads/loads
 
 ## 🤝 Contributing
 
