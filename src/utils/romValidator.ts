@@ -22,6 +22,7 @@ export interface DATEntry {
   platform?: string;
   region?: string;
   description?: string;
+  datSource?: string; // e.g., "No-Intro", "Redump"
 }
 
 export interface ValidationResult {
@@ -40,6 +41,7 @@ export interface ValidationResult {
   suggestedName?: string;
   issues?: string[];
   file?: File; // Store original file for download functionality
+  datSource?: string; // Which DAT database matched (e.g., "No-Intro", "Redump")
 }
 
 // CRC32 implementation for client-side hash calculation
@@ -373,16 +375,22 @@ function detectPlatformFromName(filename: string, size: number): string {
     if (name.includes("gc") || name.includes("gamecube")) return "GameCube";
     if (name.includes("ps2") || name.includes("playstation 2"))
       return "PlayStation 2";
+    if (name.includes("wii") || name.includes("nintendo wii")) return "Wii";
     if (name.includes("psp")) return "PSP";
 
-    // Size-based heuristics - PS1 never used ISO format, only PS2/PSP/GameCube
+    // Size-based heuristics - PS1 never used ISO format, only PS2/Wii/PSP/GameCube
     // PlayStation 2 DVDs are typically larger (650MB-4.7GB single layer, up to 8.5GB dual layer)
-    // PS2 is the most common for larger ISOs
-    if (sizeMB > 800) {
+    // PS2 is the most common for larger ISOs (especially dual-layer)
+    if (sizeMB > 4500) {
       return "PlayStation 2";
     }
+    // Wii games are typically around 4.37GB (single-layer DVD), some up to 8.5GB dual-layer
+    // Medium-large ISOs in the 1-4.5GB range are likely Wii
+    else if (sizeMB > 800) {
+      return "Wii";
+    }
     // GameCube mini-DVDs are typically smaller (< 800MB, max ~1.4GB)
-    // Medium-sized ISOs are more likely GameCube
+    // Medium-sized ISOs in the 200-800MB range are likely GameCube
     else if (sizeMB >= 200) {
       return "GameCube";
     }
@@ -455,11 +463,51 @@ function detectRegion(filename: string): string | undefined {
   return undefined;
 }
 
+// Helper function to determine DAT source from platform
+function getDATSource(platform: string): string | undefined {
+  // Import the PLATFORMS configuration to determine the source
+  // This is a synchronous operation since PLATFORMS is just a constant object
+  const PLATFORMS: Record<string, string> = {
+    "Game Boy Advance": "metadat/no-intro/Nintendo - Game Boy Advance.dat",
+    "Game Boy": "metadat/no-intro/Nintendo - Game Boy.dat",
+    "Game Boy Color": "metadat/no-intro/Nintendo - Game Boy Color.dat",
+    "Nintendo DS": "metadat/no-intro/Nintendo - Nintendo DS.dat",
+    "Nintendo DS Download Play":
+      "metadat/no-intro/Nintendo - Nintendo DS (Download Play).dat",
+    "Nintendo DSi": "metadat/no-intro/Nintendo - Nintendo DSi.dat",
+    "Nintendo 3DS": "metadat/no-intro/Nintendo - Nintendo 3DS.dat",
+    "Nintendo 64": "metadat/no-intro/Nintendo - Nintendo 64.dat",
+    "Super Nintendo":
+      "metadat/no-intro/Nintendo - Super Nintendo Entertainment System.dat",
+    "Nintendo Entertainment System":
+      "metadat/no-intro/Nintendo - Nintendo Entertainment System.dat",
+    PlayStation: "metadat/redump/Sony - PlayStation.dat",
+    "PlayStation 2": "metadat/redump/Sony - PlayStation 2.dat",
+    PSP: "metadat/no-intro/Sony - PlayStation Portable.dat",
+    GameCube: "metadat/redump/Nintendo - GameCube.dat",
+    Wii: "metadat/redump/Nintendo - Wii.dat",
+    "Sega Genesis": "metadat/no-intro/Sega - Mega Drive - Genesis.dat",
+    Dreamcast: "metadat/redump/Sega - Dreamcast.dat",
+  };
+
+  const platformPath = PLATFORMS[platform];
+  if (!platformPath) return undefined;
+
+  if (platformPath.includes("/no-intro/")) {
+    return "No-Intro";
+  } else if (platformPath.includes("/redump/")) {
+    return "Redump";
+  }
+
+  return undefined;
+}
+
 // Validate ROM against DAT entries
 export function validateROM(
   file: File,
   hashes: { md5: string; sha1: string; crc32: string },
   datEntries: DATEntry[],
+  datSource?: string,
 ): ValidationResult {
   // Look for exact hash matches (skip unavailable hashes)
   const exactMatch = datEntries.find((entry) => {
@@ -536,6 +584,7 @@ export function validateROM(
       hashes,
       matchedEntry: exactMatch,
       suggestedName,
+      datSource, // Include the DAT source
       file, // Include original file for download functionality
     };
   }
@@ -579,6 +628,7 @@ export async function loadDATFiles(): Promise<DATEntry[]> {
 export async function validateROMs(
   files: File[],
   onProgress?: (current: number, total: number, currentFile: string) => void,
+  forcePlatform?: string,
 ): Promise<ValidationResult[]> {
   const results: ValidationResult[] = [];
 
@@ -603,7 +653,133 @@ export async function validateROMs(
 
     let result: ValidationResult;
 
-    if (platforms.length > 0) {
+    // If a platform is forced by the user, try that first but fall back to auto-detection
+    if (forcePlatform) {
+      try {
+        const platformEntries = await loadPlatformDAT(forcePlatform);
+        const datSource = getDATSource(forcePlatform);
+        const forcedResult = validateROM(
+          file,
+          hashes,
+          platformEntries,
+          datSource,
+        );
+
+        // If we found a match with the forced platform, use it
+        if (forcedResult.status !== "unknown") {
+          result = forcedResult;
+        } else {
+          // No match with forced platform, fall back to automatic detection
+          console.log(
+            `No match found for ${file.name} with forced platform ${forcePlatform}, falling back to auto-detection`,
+          );
+
+          if (platforms.length > 0) {
+            // Continue with normal auto-detection logic
+            if (platforms.length > 1) {
+              const mostLikelyPlatform = detectPlatformFromName(
+                file.name,
+                file.size,
+              );
+
+              // Reorder platforms to check the most likely one first
+              const orderedPlatforms = platforms.includes(mostLikelyPlatform)
+                ? [
+                    mostLikelyPlatform,
+                    ...platforms.filter((p) => p !== mostLikelyPlatform),
+                  ]
+                : platforms;
+
+              result = { status: "unknown" } as ValidationResult;
+
+              // Try platforms one by one until we find a match
+              for (const platform of orderedPlatforms) {
+                const platformEntries = await loadPlatformDAT(platform);
+                const datSource = getDATSource(platform);
+                const platformResult = validateROM(
+                  file,
+                  hashes,
+                  platformEntries,
+                  datSource,
+                );
+
+                if (platformResult.status !== "unknown") {
+                  result = platformResult;
+                  break; // Found a match, stop checking other platforms
+                }
+              }
+
+              // Continue with existing fallback logic...
+              if (result.status === "unknown") {
+                const ext = file.name
+                  .toLowerCase()
+                  .substring(file.name.lastIndexOf("."));
+
+                let fallbackPlatforms: string[] = [];
+
+                if (ext === ".iso") {
+                  fallbackPlatforms = [
+                    "PlayStation 2",
+                    "Wii",
+                    "PSP",
+                    "GameCube",
+                  ];
+                } else if (ext === ".bin") {
+                  fallbackPlatforms = [
+                    "PlayStation",
+                    "Dreamcast",
+                    "PlayStation 2",
+                  ];
+                }
+
+                if (fallbackPlatforms.length > 0) {
+                  const uncheckedPlatforms = fallbackPlatforms.filter(
+                    (p) => !orderedPlatforms.includes(p),
+                  );
+
+                  for (const platform of uncheckedPlatforms) {
+                    const fallbackEntries = await loadPlatformDAT(platform);
+                    const datSource = getDATSource(platform);
+                    const fallbackResult = validateROM(
+                      file,
+                      hashes,
+                      fallbackEntries,
+                      datSource,
+                    );
+
+                    if (fallbackResult.status !== "unknown") {
+                      result = fallbackResult;
+                      break;
+                    }
+                  }
+                }
+              }
+
+              if (result.status === "unknown") {
+                const fallbackEntries = await loadPlatformDAT(
+                  orderedPlatforms[0],
+                );
+                const datSource = getDATSource(orderedPlatforms[0]);
+                result = validateROM(file, hashes, fallbackEntries, datSource);
+              }
+            } else {
+              // Single platform, load and validate normally
+              const platformEntries = await loadPlatformDAT(platforms[0]);
+              const datSource = getDATSource(platforms[0]);
+              result = validateROM(file, hashes, platformEntries, datSource);
+            }
+          } else {
+            // Fallback to all DATs if platform detection fails
+            const platformEntries = await loadDATFiles();
+            result = validateROM(file, hashes, platformEntries, "Mixed");
+          }
+        }
+      } catch (error) {
+        console.error(`Error loading forced platform ${forcePlatform}:`, error);
+        // Fall back to automatic detection if forced platform fails to load
+        result = { status: "unknown" } as ValidationResult;
+      }
+    } else if (platforms.length > 0) {
       // For multi-platform formats, try the most likely platform first based on size/name
       if (platforms.length > 1) {
         const mostLikelyPlatform = detectPlatformFromName(file.name, file.size);
@@ -621,7 +797,13 @@ export async function validateROMs(
         // Try platforms one by one until we find a match
         for (const platform of orderedPlatforms) {
           const platformEntries = await loadPlatformDAT(platform);
-          const platformResult = validateROM(file, hashes, platformEntries);
+          const datSource = getDATSource(platform);
+          const platformResult = validateROM(
+            file,
+            hashes,
+            platformEntries,
+            datSource,
+          );
 
           if (platformResult.status !== "unknown") {
             result = platformResult;
@@ -653,7 +835,13 @@ export async function validateROMs(
 
             for (const platform of uncheckedPlatforms) {
               const fallbackEntries = await loadPlatformDAT(platform);
-              const fallbackResult = validateROM(file, hashes, fallbackEntries);
+              const datSource = getDATSource(platform);
+              const fallbackResult = validateROM(
+                file,
+                hashes,
+                fallbackEntries,
+                datSource,
+              );
 
               if (fallbackResult.status !== "unknown") {
                 result = fallbackResult;
@@ -666,17 +854,19 @@ export async function validateROMs(
         // Final fallback: if still unknown, return result with the most likely platform info
         if (result.status === "unknown") {
           const fallbackEntries = await loadPlatformDAT(orderedPlatforms[0]);
-          result = validateROM(file, hashes, fallbackEntries);
+          const datSource = getDATSource(orderedPlatforms[0]);
+          result = validateROM(file, hashes, fallbackEntries, datSource);
         }
       } else {
         // Single platform, load and validate normally
         const platformEntries = await loadPlatformDAT(platforms[0]);
-        result = validateROM(file, hashes, platformEntries);
+        const datSource = getDATSource(platforms[0]);
+        result = validateROM(file, hashes, platformEntries, datSource);
       }
     } else {
       // Fallback to all DATs if platform detection fails
       const platformEntries = await loadDATFiles();
-      result = validateROM(file, hashes, platformEntries);
+      result = validateROM(file, hashes, platformEntries, "Mixed");
     }
 
     results.push(result);

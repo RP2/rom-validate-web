@@ -11,6 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   CheckCircle,
   XCircle,
   AlertTriangle,
@@ -20,6 +28,9 @@ import {
   FileText,
   HardDrive,
   Hash,
+  Copy,
+  Calendar,
+  Info,
 } from "lucide-react";
 import type { ValidationResult } from "@/utils/romValidator";
 
@@ -355,6 +366,38 @@ export default function ValidationResults() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      // You could add a toast notification here if you have one
+      console.log("Copied to clipboard:", text);
+    } catch (err) {
+      console.error("Failed to copy to clipboard:", err);
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+    }
+  };
+
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleString();
+  };
+
+  const getDATSourceURL = (datSource: string) => {
+    switch (datSource?.toLowerCase()) {
+      case "no-intro":
+        return "https://datomatic.no-intro.org/";
+      case "redump":
+        return "http://redump.org/";
+      default:
+        return null;
+    }
+  };
+
   if (!summary) return null;
 
   return (
@@ -429,37 +472,35 @@ export default function ValidationResults() {
         </CardHeader>
         <CardContent>
           {/* Filters */}
-          <div className="mb-6 flex flex-wrap gap-3">
-            <div className="flex gap-2">
-              <Button
-                variant={selectedStatus === "all" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedStatus("all")}
-              >
-                All Status
-              </Button>
-              <Button
-                variant={selectedStatus === "valid" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedStatus("valid")}
-              >
-                Valid
-              </Button>
-              <Button
-                variant={selectedStatus === "unknown" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedStatus("unknown")}
-              >
-                Unknown
-              </Button>
-              <Button
-                variant={selectedStatus === "renamed" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setSelectedStatus("renamed")}
-              >
-                Renamed
-              </Button>
-            </div>
+          <div className="mb-6 flex flex-wrap gap-2">
+            <Button
+              variant={selectedStatus === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedStatus("all")}
+            >
+              All Status
+            </Button>
+            <Button
+              variant={selectedStatus === "valid" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedStatus("valid")}
+            >
+              Valid
+            </Button>
+            <Button
+              variant={selectedStatus === "unknown" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedStatus("unknown")}
+            >
+              Unknown
+            </Button>
+            <Button
+              variant={selectedStatus === "renamed" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedStatus("renamed")}
+            >
+              Renamed
+            </Button>
           </div>
 
           {/* Results List */}
@@ -469,28 +510,34 @@ export default function ValidationResults() {
                 key={`${result.filename}-${index}`}
                 className="border-border rounded-lg border p-4"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex flex-1 items-start space-x-3">
-                    {getStatusIcon(result.status)}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex min-w-0 flex-1 items-start space-x-3">
+                    <div className="shrink-0">
+                      {getStatusIcon(result.status)}
+                    </div>
                     <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex items-center gap-2">
-                        <h4 className="text-foreground truncate font-medium">
+                      <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <h4 className="text-foreground min-w-0 truncate font-medium">
                           {result.filename}
                         </h4>
-                        {getStatusBadge(result.status)}
+                        <div className="shrink-0">
+                          {getStatusBadge(result.status)}
+                        </div>
                       </div>
 
                       {result.originalName !== result.filename && (
-                        <p className="text-muted-foreground mb-1 text-sm">
+                        <p className="text-muted-foreground mb-1 text-sm break-words">
                           Original: {result.originalName}
                         </p>
                       )}
 
-                      <div className="text-muted-foreground flex flex-wrap gap-4 text-xs">
+                      <div className="text-muted-foreground flex flex-wrap gap-2 text-xs sm:gap-4">
                         {result.platform && result.platform !== "unknown" && (
                           <span className="flex items-center gap-1">
                             <HardDrive className="h-3 w-3" />
-                            {result.platform}
+                            <span className="break-words">
+                              {result.platform}
+                            </span>
                           </span>
                         )}
                         <span className="flex items-center gap-1">
@@ -528,13 +575,296 @@ export default function ValidationResults() {
                     </div>
                   </div>
 
-                  <div className="ml-4 flex gap-2">
-                    <Button variant="ghost" size="sm">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm">
-                      <Hash className="h-4 w-4" />
-                    </Button>
+                  <div className="flex flex-col gap-2 sm:ml-4 sm:flex-row">
+                    {/* File Details Dialog */}
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="border-border flex w-full items-center gap-2 border sm:w-auto sm:border-0 sm:px-2"
+                        >
+                          <Eye className="h-4 w-4" />
+                          <span className="sm:hidden">Details</span>
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-[95vw] sm:max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <FileText className="h-5 w-5" />
+                            File Details
+                          </DialogTitle>
+                          <DialogDescription className="break-words">
+                            Detailed information about {result.filename}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-6">
+                          {/* Basic File Info */}
+                          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                            <div className="space-y-4">
+                              <h4 className="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
+                                File Information
+                              </h4>
+                              <div className="space-y-3">
+                                <div className="space-y-1">
+                                  <span className="text-muted-foreground text-sm">
+                                    Filename
+                                  </span>
+                                  <p className="bg-muted rounded px-2 py-1 font-mono text-sm break-all">
+                                    {result.filename}
+                                  </p>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <span className="text-muted-foreground text-sm">
+                                    Size
+                                  </span>
+                                  <span className="text-sm font-medium">
+                                    {formatFileSize(result.size)}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <span className="text-muted-foreground text-sm">
+                                    Status
+                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    {getStatusIcon(result.status)}
+                                    {getStatusBadge(result.status)}
+                                  </div>
+                                </div>
+                                {result.file && (
+                                  <div className="space-y-1">
+                                    <span className="text-muted-foreground text-sm">
+                                      Modified
+                                    </span>
+                                    <p className="text-sm">
+                                      {formatDate(result.file.lastModified)}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="space-y-4">
+                              <h4 className="text-muted-foreground text-sm font-semibold tracking-wide uppercase">
+                                Platform Information
+                              </h4>
+                              <div className="space-y-3">
+                                {result.platform && (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <span className="text-muted-foreground text-sm">
+                                      Platform
+                                    </span>
+                                    <span className="text-sm font-medium">
+                                      {result.platform}
+                                    </span>
+                                  </div>
+                                )}
+                                {result.region && (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <span className="text-muted-foreground text-sm">
+                                      Region
+                                    </span>
+                                    <div>
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        {result.region}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                )}
+                                {result.matchedEntry && (
+                                  <>
+                                    <div className="space-y-1">
+                                      <span className="text-muted-foreground text-sm">
+                                        Matched ROM
+                                      </span>
+                                      <p className="bg-muted rounded px-2 py-1 font-mono text-xs break-all">
+                                        {result.matchedEntry.name}
+                                      </p>
+                                    </div>
+                                    {result.datSource && (
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <span className="text-muted-foreground text-sm">
+                                          DAT Source
+                                        </span>
+                                        <div>
+                                          {getDATSourceURL(result.datSource) ? (
+                                            <a
+                                              href={
+                                                getDATSourceURL(
+                                                  result.datSource,
+                                                )!
+                                              }
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="inline-block"
+                                            >
+                                              <Badge
+                                                variant="secondary"
+                                                className="hover:bg-secondary/80 cursor-pointer text-xs transition-colors"
+                                              >
+                                                {result.datSource}
+                                              </Badge>
+                                            </a>
+                                          ) : (
+                                            <Badge
+                                              variant="secondary"
+                                              className="text-xs"
+                                            >
+                                              {result.datSource}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                                {!result.platform &&
+                                  !result.region &&
+                                  !result.matchedEntry && (
+                                    <p className="text-muted-foreground text-sm italic">
+                                      No platform information available
+                                    </p>
+                                  )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Suggested Name */}
+                          {result.suggestedName && (
+                            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950/20">
+                              <div className="mb-3 flex items-center gap-2">
+                                <RotateCcw className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                <h4 className="font-semibold text-blue-800 dark:text-blue-200">
+                                  Suggested Rename
+                                </h4>
+                              </div>
+                              <code className="rounded bg-white/50 px-2 py-1 text-sm break-all dark:bg-black/20">
+                                {result.suggestedName}
+                              </code>
+                            </div>
+                          )}
+
+                          {/* Issues */}
+                          {result.issues && result.issues.length > 0 && (
+                            <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/20">
+                              <div className="mb-3 flex items-center gap-2">
+                                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                <h4 className="font-semibold text-red-800 dark:text-red-200">
+                                  Issues Found
+                                </h4>
+                              </div>
+                              <ul className="space-y-2">
+                                {result.issues.map((issue, idx) => (
+                                  <li
+                                    key={idx}
+                                    className="flex items-start gap-2 text-sm"
+                                  >
+                                    <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-500" />
+                                    <span className="text-red-700 dark:text-red-300">
+                                      {issue}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Hash Information Dialog */}
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="border-border flex w-full items-center gap-2 border sm:w-auto sm:border-0 sm:px-2"
+                        >
+                          <Hash className="h-4 w-4" />
+                          <span className="sm:hidden">Hashes</span>
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-[95vw] sm:max-w-lg">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <Hash className="h-5 w-5" />
+                            File Hashes
+                          </DialogTitle>
+                          <DialogDescription className="break-words">
+                            Calculated hashes for {result.filename}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          {/* CRC32 */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">CRC32</label>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                              <code className="bg-muted min-w-0 flex-1 rounded px-3 py-2 font-mono text-sm break-all">
+                                {result.hashes.crc32}
+                              </code>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  copyToClipboard(result.hashes.crc32)
+                                }
+                                className="shrink-0"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* MD5 */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">MD5</label>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                              <code className="bg-muted min-w-0 flex-1 rounded px-3 py-2 font-mono text-sm break-all">
+                                {result.hashes.md5}
+                              </code>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  copyToClipboard(result.hashes.md5)
+                                }
+                                className="shrink-0"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* SHA1 */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">SHA1</label>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                              <code className="bg-muted min-w-0 flex-1 rounded px-3 py-2 font-mono text-sm break-all">
+                                {result.hashes.sha1}
+                              </code>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  copyToClipboard(result.hashes.sha1)
+                                }
+                                className="shrink-0"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="text-muted-foreground pt-2 text-xs">
+                            Click the copy buttons to copy individual hashes to
+                            clipboard
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </div>
               </div>

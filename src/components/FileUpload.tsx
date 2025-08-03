@@ -6,12 +6,27 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CheckCircle, File, Upload, X } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle,
+  File,
+  Upload,
+  X,
+  Settings,
+} from "lucide-react";
 import { validateROMs, type ValidationResult } from "@/utils/romValidator";
+import { getSupportedPlatforms } from "@/utils/datLoader";
 
 interface UploadedFile {
   file: File;
@@ -31,6 +46,14 @@ export default function FileUpload() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  const [selectedPlatform, setSelectedPlatform] = useState<string>("auto");
+  const [supportedPlatforms, setSupportedPlatforms] = useState<string[]>([]);
+
+  // Load supported platforms on component mount
+  useEffect(() => {
+    const platforms = getSupportedPlatforms();
+    setSupportedPlatforms(platforms.sort());
+  }, []);
 
   // Prevent default browser behavior for drag and drop
   useEffect(() => {
@@ -247,6 +270,7 @@ export default function FileUpload() {
             }),
           );
         },
+        selectedPlatform !== "auto" ? selectedPlatform : undefined, // Pass selected platform if chosen
       );
 
       // Mark all files as completed
@@ -347,6 +371,79 @@ export default function FileUpload() {
           </p>
         </div>
       </div>
+
+      {/* Platform Selection (Optional) */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Platform Selection (Optional)
+          </CardTitle>
+          <CardDescription>
+            Choose a specific platform for faster validation, or leave on "Auto"
+            for intelligent detection
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="platform-select" className="text-sm font-medium">
+                Target Platform
+              </label>
+              <Select
+                value={selectedPlatform}
+                onValueChange={setSelectedPlatform}
+              >
+                <SelectTrigger id="platform-select">
+                  <SelectValue>
+                    {selectedPlatform === "auto"
+                      ? "Auto-detect (recommended)"
+                      : selectedPlatform}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">
+                    Auto-detect (recommended)
+                  </SelectItem>
+                  {supportedPlatforms.length > 0 &&
+                    supportedPlatforms.map((platform) => (
+                      <SelectItem key={platform} value={platform}>
+                        {platform}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="bg-muted/50 rounded-lg p-3 text-sm">
+              <p className="mb-2 font-medium">How it works:</p>
+              <ul className="text-muted-foreground space-y-1">
+                <li>
+                  <strong>Auto-detect:</strong> Uses file extension, size, and
+                  filename hints to determine the most likely platform(s) and
+                  validates in smart order
+                </li>
+                <li>
+                  <strong>Manual selection:</strong> Tries the chosen platform
+                  first for maximum speed, then falls back to auto-detection if
+                  no match is found
+                </li>
+              </ul>
+              {selectedPlatform !== "auto" && (
+                <div className="border-muted mt-2 border-t pt-2">
+                  <p className="text-foreground">
+                    <strong>Selected:</strong> {selectedPlatform}
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    Will try this platform first, then auto-detect if no matches
+                    are found
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* File List */}
       {files.length > 0 && (
