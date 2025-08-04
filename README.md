@@ -1,6 +1,6 @@
-# Auto ROM Validator Web Frontend
+# Auto ROM Validator Web
 
-A modern web application for validating ROM files using No-Intro and Redump database DAT files. This frontend provides similar functionality as the [CLI version](https://github.com/RP2/auto-rom-validator) with a user-friendly web interface.
+A modern web application for validating ROM files using No-Intro and Redump database DAT files. This is a complete rewrite of the original Python CLI tool with enhanced features and a user-friendly web interface.
 
 ## ✨ Features
 
@@ -8,7 +8,7 @@ A modern web application for validating ROM files using No-Intro and Redump data
 - **Smart Platform Detection**: Intelligent size-based and filename-based platform detection
 - **Optimized Performance**: Sequential DAT loading with early exit on match detection
 - **Multiple Platform Support**: Nintendo, Sony, Sega, and more
-- **CLI-Compatible**: Uses the same configuration as the CLI version
+- **Enhanced Web Features**: Modern UI with drag-and-drop, progress tracking, and interactive results
 - **Encrypted DAT Support**: Bundled encrypted Nintendo DS DATs for comprehensive validation
 - **Cross-Platform Validation**: Automatic PlayStation format fallback for edge cases
 - **Drag & Drop Interface**: Modern, responsive UI with shadcn/ui components
@@ -63,7 +63,7 @@ A modern web application for validating ROM files using No-Intro and Redump data
 
 ## 🔧 DAT File Configuration
 
-This project uses the same configuration as the CLI version for maximum compatibility.
+This project uses a similar approach to the original CLI version but with enhanced web-specific optimizations and features.
 
 ### DAT Sources
 
@@ -327,11 +327,12 @@ Access comprehensive DAT management via the settings icon (⚙️) in the header
 
 ## 🤝 Contributing
 
-This project maintains compatibility with the [CLI version](https://github.com/RP2/auto-rom-validator). When adding features:
+This project is a modern web rewrite of the original [CLI ROM Validator](https://github.com/RP2/auto-rom-validator). When adding features:
 
-1. Keep `datLoader.ts` configuration synchronized with CLI `config.py`
-2. Test with the included `tests/test-config.mts` script
-3. Follow existing TypeScript patterns and component structure
+1. Follow TypeScript best practices and maintain type safety
+2. Test platform detection with the included test scripts
+3. Follow existing component structure and design patterns
+4. Ensure mobile-responsive design with shadcn/ui components
 
 ## 🔧 Troubleshooting
 
@@ -373,7 +374,7 @@ This project maintains compatibility with the [CLI version](https://github.com/R
 
 ## 🔗 Related Projects
 
-- [CLI ROM Validator](https://github.com/RP2/auto-rom-validator) - Command-line version
+- [Auto ROM Validator CLI](https://github.com/RP2/auto-rom-validator) - Original Python command-line version
 - [No-Intro](https://no-intro.org/) - Cartridge-based ROM preservation database
 - [Redump](http://redump.org/) - Optical disc preservation database
 - [Libretro Database](https://github.com/libretro/libretro-database) - Repository hosting No-Intro and Redump DAT files
