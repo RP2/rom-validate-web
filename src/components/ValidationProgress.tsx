@@ -279,7 +279,7 @@ export default function ValidationProgress({
                       )}
                     </div>
 
-                    <div className="flex flex-shrink-0 items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                       <span className="text-muted-foreground">
                         {formatFileSize(file.size)}
                       </span>

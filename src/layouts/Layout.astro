@@ -1,6 +1,7 @@
 ---
 import "../styles/global.css";
 import Header from "@/components/Header.tsx";
+import { Toaster } from "sonner";
 
 export interface Props {
   title: string;
@@ -46,6 +47,7 @@ const { title, description = "Validate your ROM files online" } = Astro.props;
     <div class="flex min-h-full flex-col">
       <Header client:load />
       <slot />
+      <Toaster client:load richColors position="top-center" />
     </div>
   </body>
 </html>

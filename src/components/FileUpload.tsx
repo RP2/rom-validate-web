@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertCircle,
@@ -24,10 +24,12 @@ import {
   Upload,
   X,
   Settings,
+  AlertTriangle,
 } from "lucide-react";
 import { validateROMs, type ValidationResult } from "@/utils/romValidator";
 import { getSupportedPlatforms } from "@/utils/datLoader";
 import ValidationProgress from "./ValidationProgress";
+import { toast } from "sonner";
 
 interface UploadedFile {
   file: File;
@@ -237,9 +239,11 @@ export default function FileUpload() {
 
       // For security reasons, browsers don't allow direct access to file:// URLs
       // Show a helpful message to the user
-      alert(
-        `File detected: ${fileName}\n\nFor security reasons, files dragged as URLs cannot be accessed directly. Please use the "Select Files" button instead.`,
-      );
+      toast.warning(`File detected: ${fileName}`, {
+        description:
+          'For security reasons, files dragged as URLs cannot be accessed directly. Please use the "Select Files" button instead.',
+        duration: 8000,
+      });
     } catch (error) {
       console.error("Error handling file URL:", error);
     }
@@ -454,6 +458,22 @@ export default function FileUpload() {
       setShowProgress(false);
       setValidationStats(null);
 
+      // Check for out of memory error
+      const isOutOfMemory =
+        error instanceof Error &&
+        (error.name === "OutOfMemoryError" ||
+          error.message.includes("allocation") ||
+          error.message.includes("memory") ||
+          error.message.includes("out of memory"));
+
+      if (isOutOfMemory) {
+        toast.error("Out of Memory", {
+          description:
+            "The browser ran out of memory while processing your files. Please try again with fewer files at a time, or process large files individually.",
+          duration: 10000,
+        });
+      }
+
       // Show more detailed error information
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -463,14 +483,33 @@ export default function FileUpload() {
         prev.map((f) => ({
           ...f,
           status: "error",
-          error: `Validation failed: ${errorMessage}`,
+          error: isOutOfMemory
+            ? "Out of memory - please retry with fewer files"
+            : `Validation failed: ${errorMessage}`,
         })),
       );
     }
   };
 
+  // Check if any files are larger than 1GB
+  const hasLargeFiles = files.some((f) => f.file.size > 1024 * 1024 * 1024);
+
   return (
     <div className="space-y-6">
+      {/* Large File Warning */}
+      {hasLargeFiles && (
+        <Alert className="border-amber-500/50 bg-amber-500/10 text-amber-500 [&>svg]:text-amber-500">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Large Files Detected</AlertTitle>
+          <AlertDescription>
+            Files larger than 1GB (like PS2 ISOs) will take longer to process.
+            Processing continues in the background and you can monitor progress
+            below. For best results with very large files, process fewer files
+            at a time.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Upload Area */}
       <div
         className={`relative cursor-pointer rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
@@ -621,7 +660,7 @@ export default function FileUpload() {
                   key={uploadedFile.id}
                   className="border-border flex items-center gap-3 rounded-md border p-3"
                 >
-                  <File className="text-muted-foreground h-5 w-5 flex-shrink-0" />
+                  <File className="text-muted-foreground h-5 w-5 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="text-foreground truncate text-sm font-medium">
                       {uploadedFile.file.name}

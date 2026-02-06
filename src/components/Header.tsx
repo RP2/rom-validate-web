@@ -11,6 +11,18 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 import { Moon, Sun, Menu, Github, Settings } from "lucide-react";
 
@@ -20,6 +32,7 @@ export default function Header() {
   const [cachedDATs, setCachedDATs] = React.useState<
     Array<{ platform: string; source: string; entryCount: number }>
   >([]);
+  const [clearCacheDialogOpen, setClearCacheDialogOpen] = React.useState(false);
 
   const toggleTheme = () => {
     const html = document.documentElement;
@@ -59,34 +72,18 @@ export default function Header() {
   };
 
   const handleClearCache = async () => {
-    // Show confirmation dialog
-    const confirmed = confirm(
-      "Are you sure you want to clear all cached DAT files?\n\n" +
-        "This will remove:\n" +
-        "• All downloaded Libretro DAT files\n" +
-        "• All uploaded custom DAT files\n" +
-        "• Cached validation data\n\n" +
-        "Bundled DAT files will remain available and are not affected.",
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
     try {
       const { clearDATCache } = await import("@/utils/datLoader");
       clearDATCache();
 
-      // Use console.log for mobile debugging and alert as fallback
-      console.log("DAT cache cleared successfully!");
-      alert("DAT cache cleared successfully!");
+      toast.success("DAT cache cleared successfully!");
 
-      // Refresh the cached DATs list to reflect changes
       handleLoadCachedDATs();
+      setClearCacheDialogOpen(false);
       setDevToolsOpen(false);
     } catch (error) {
       console.error("Failed to clear cache:", error);
-      alert("Failed to clear cache");
+      toast.error("Failed to clear cache");
     }
   };
 
@@ -94,20 +91,23 @@ export default function Header() {
     try {
       const { getCacheStatus } = await import("@/utils/datLoader");
       const status = await getCacheStatus();
-      const message =
-        `Cache Status:\n` +
-        `Bundled: ${status.bundled} DATs\n` +
-        `Memory: ${status.memory} DATs\n` +
-        `Cached: ${status.persistent} DATs\n` +
-        `Cache Size: ${status.totalSize}`;
 
-      // Use console.log for mobile debugging and alert as fallback
-      console.log(message);
-      alert(message);
+      toast.info("Cache Status", {
+        description: (
+          <div className="text-left">
+            <p>Bundled: {status.bundled} DATs</p>
+            <p>Memory: {status.memory} DATs</p>
+            <p>Cached: {status.persistent} DATs</p>
+            <p>Cache Size: {status.totalSize}</p>
+          </div>
+        ),
+        duration: 8000,
+      });
+
       setDevToolsOpen(false);
     } catch (error) {
       console.error("Failed to get cache status:", error);
-      alert("Failed to get cache status");
+      toast.error("Failed to get cache status");
     }
   };
 
@@ -129,7 +129,6 @@ export default function Header() {
       const rawContent = await getRawDATContent(platform, source);
 
       if (rawContent) {
-        // Create a new window/tab with the DAT content
         const newWindow = window.open("", "_blank");
         if (newWindow) {
           const htmlContent = `<!DOCTYPE html>
@@ -193,18 +192,18 @@ export default function Header() {
           newWindow.document.write(htmlContent);
           newWindow.document.close();
         } else {
-          alert(
+          toast.warning(
             "Failed to open new window. Please check your popup blocker settings.",
           );
         }
       } else {
-        alert("Failed to load DAT content");
+        toast.error("Failed to load DAT content");
       }
 
       setDevToolsOpen(false);
     } catch (error) {
       console.error("Failed to browse DAT:", error);
-      alert("Failed to browse DAT");
+      toast.error("Failed to browse DAT");
     }
   };
 
@@ -220,17 +219,17 @@ export default function Header() {
           const result = await uploadCustomDAT(file);
 
           if (result.success) {
-            alert(
-              `Custom DAT uploaded successfully!\nPlatform: ${result.platform}\nEntries: ${result.entryCount}`,
-            );
-            // Refresh the cached DATs list
+            toast.success("Custom DAT uploaded successfully!", {
+              description: `Platform: ${result.platform}\nEntries: ${result.entryCount}`,
+              duration: 5000,
+            });
             handleLoadCachedDATs();
           } else {
-            alert(`Failed to upload DAT: ${result.error}`);
+            toast.error(`Failed to upload DAT: ${result.error}`);
           }
         } catch (error) {
           console.error("Failed to upload custom DAT:", error);
-          alert("Failed to upload custom DAT");
+          toast.error("Failed to upload custom DAT");
         }
       }
     };
@@ -246,7 +245,7 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 w-full border-b backdrop-blur">
+    <header className="bg-background/95 supports-backdrop-filter:bg-background/60 sticky top-0 z-50 w-full border-b backdrop-blur">
       <div className="container mx-auto flex h-16 items-center px-4">
         {/* Left side - Logo */}
         <div className="flex items-center space-x-2">
@@ -290,8 +289,8 @@ export default function Header() {
             onClick={toggleTheme}
             className="h-9 w-9 cursor-pointer p-0"
           >
-            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <Sun className="h-4 w-4 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
+            <Moon className="absolute h-4 w-4 scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
             <span className="sr-only">Toggle theme</span>
           </Button>
 
@@ -327,13 +326,36 @@ export default function Header() {
                 >
                   Cache Status
                 </Button>
-                <Button
-                  variant="ghost"
-                  className="cursor-pointer touch-manipulation justify-start px-3"
-                  onClick={handleClearCache}
+                <AlertDialog
+                  open={clearCacheDialogOpen}
+                  onOpenChange={setClearCacheDialogOpen}
                 >
-                  Clear DAT Cache
-                </Button>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="cursor-pointer touch-manipulation justify-start px-3"
+                    >
+                      Clear DAT Cache
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Clear DAT Cache?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will remove all downloaded Libretro DAT files,
+                        uploaded custom DAT files, and cached validation data.
+                        Bundled DAT files will remain available and are not
+                        affected.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleClearCache}>
+                        Clear Cache
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
                 <Button
                   variant="ghost"
                   className="cursor-pointer touch-manipulation justify-start px-3"

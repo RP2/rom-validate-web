@@ -1,5 +1,63 @@
 // Client-side ROM validation utilities
 
+// Web Worker singleton for hash calculation
+let hashWorker: Worker | null = null;
+let workerMessageId = 0;
+const pendingOperations = new Map<
+  string,
+  {
+    resolve: (value: { md5: string; sha1: string; crc32: string }) => void;
+    reject: (error: Error) => void;
+    onProgress?: (progress: number) => void;
+  }
+>();
+
+function getHashWorker(): Worker {
+  if (!hashWorker) {
+    // Create worker from the worker file
+    hashWorker = new Worker(
+      new URL("../workers/hashWorker.ts", import.meta.url),
+      {
+        type: "module",
+      },
+    );
+
+    hashWorker.onmessage = (event: MessageEvent) => {
+      const data = event.data;
+      const operation = pendingOperations.get(data.fileId);
+
+      if (!operation) {
+        console.warn("Received message for unknown operation:", data.fileId);
+        return;
+      }
+
+      switch (data.type) {
+        case "PROGRESS":
+          operation.onProgress?.(data.progress);
+          break;
+        case "COMPLETE":
+          pendingOperations.delete(data.fileId);
+          operation.resolve(data.hashes);
+          break;
+        case "ERROR":
+          pendingOperations.delete(data.fileId);
+          const error = new Error(data.error);
+          if (data.fatal) {
+            error.name = "OutOfMemoryError";
+          }
+          operation.reject(error);
+          break;
+      }
+    };
+
+    hashWorker.onerror = (error) => {
+      console.error("Hash worker error:", error);
+    };
+  }
+
+  return hashWorker;
+}
+
 // Simple MD5 implementation as fallback when Web Crypto API
 function simpleMD5(data: Uint8Array): string {
   // This is a simplified version - in production you might want to use a library like crypto-js
@@ -24,6 +82,9 @@ export interface DATEntry {
   description?: string;
   datSource?: string; // e.g., "No-Intro", "Redump"
 }
+
+import { detectDiscPlatform, getPlatformPriority } from "./discDetector";
+import type { DiscPlatform } from "./discDetector";
 
 export interface ValidationResult {
   filename: string;
@@ -63,8 +124,33 @@ function crc32(data: Uint8Array): string {
   return ((crc ^ 0xffffffff) >>> 0).toString(16).toUpperCase().padStart(8, "0");
 }
 
-// Calculate file hashes client-side with progress tracking
+// Calculate file hashes client-side with progress tracking using Web Worker
+// Uses streaming with 1MB chunks to handle files of any size without OOM
 export async function calculateFileHashes(
+  file: File,
+  onProgress?: (progress: number) => void,
+): Promise<{ md5: string; sha1: string; crc32: string }> {
+  const worker = getHashWorker();
+  const fileId = `hash-${++workerMessageId}-${file.name}`;
+
+  return new Promise((resolve, reject) => {
+    pendingOperations.set(fileId, {
+      resolve,
+      reject,
+      onProgress,
+    });
+
+    worker.postMessage({
+      type: "HASH_FILE",
+      file,
+      fileId,
+    });
+  });
+}
+
+// Legacy synchronous hash calculation (kept for compatibility/fallback)
+// Note: This loads the entire file into memory and should not be used for large files
+async function calculateFileHashesLegacy(
   file: File,
   onProgress?: (progress: number) => void,
 ): Promise<{ md5: string; sha1: string; crc32: string }> {
@@ -569,16 +655,27 @@ export function validateROM(
     // Ensure suggested name includes file extension
     let suggestedName = undefined;
     if (isRenamed && exactMatch.name) {
-      // Get the original file extension
-      const originalExt = file.name.substring(file.name.lastIndexOf("."));
+      // Extract DAT base name (without extension)
+      const datBaseName = exactMatch.name.replace(/\.[^/.]+$/, "");
 
-      // If the DAT name doesn't end with the same extension, add it
-      if (exactMatch.name.toLowerCase().endsWith(originalExt.toLowerCase())) {
-        suggestedName = exactMatch.name;
+      // Find the base name position in user's filename (case insensitive)
+      const userLower = file.name.toLowerCase();
+      const datBaseLower = datBaseName.toLowerCase();
+      const baseEndPos = userLower.indexOf(datBaseLower);
+
+      if (baseEndPos !== -1) {
+        // Base name found - preserve everything after it (extensions)
+        const userExtensions = file.name.substring(
+          baseEndPos + datBaseName.length,
+        );
+        // Normalize extensions to lowercase for consistency
+        const normalizedExt = userExtensions.toLowerCase();
+        // Combine DAT base name + normalized user extensions
+        suggestedName = datBaseName + normalizedExt;
       } else {
-        // Remove any existing extension from DAT name and add the original extension
-        const nameWithoutExt = exactMatch.name.replace(/\.[^/.]+$/, "");
-        suggestedName = nameWithoutExt + originalExt;
+        // Base name not found in user's filename (shouldn't happen, but safety first)
+        // Don't suggest rename as we can't determine the extensions
+        suggestedName = undefined;
       }
     }
 
@@ -632,6 +729,49 @@ export async function loadDATFiles(): Promise<DATEntry[]> {
   return await loadAllBundledDATs();
 }
 
+/**
+ * Determine which platforms to check for a file
+ * Uses disc header detection for ISO files when auto-detecting
+ * Respects forced platform selection
+ */
+async function determinePlatforms(
+  file: File,
+  forcePlatform?: string,
+): Promise<string[]> {
+  // If user forced a platform, only check that one
+  if (forcePlatform) {
+    return [forcePlatform];
+  }
+
+  const ext = file.name.toLowerCase().substring(file.name.lastIndexOf("."));
+
+  // For ISO files, use disc header detection
+  if (ext === ".iso") {
+    const detected = await detectDiscPlatform(file);
+    if (detected !== "unknown") {
+      return [detected];
+    }
+    // Fallback: return all possible platforms in priority order
+    return getPlatformPriority(file.size) as string[];
+  }
+
+  // For other files, use the extension map from datLoader
+  const { getPlatformsForFile } = await import("./datLoader");
+  const platforms = getPlatformsForFile(file.name);
+
+  if (platforms.length > 0) {
+    return platforms;
+  }
+
+  // Ultimate fallback: try to detect from filename
+  const detected = detectPlatformFromName(file.name, file.size);
+  if (detected !== "unknown") {
+    return [detected];
+  }
+
+  return [];
+}
+
 // Process multiple files
 export async function validateROMs(
   files: File[],
@@ -671,142 +811,37 @@ export async function validateROMs(
     // Loading DATs stage
     onProgress?.(i + 1, validFiles.length, file.name, "loading-dats", 100);
 
-    // Get platform-specific DAT entries based on file extension (CLI-style)
-    const { getPlatformsForFile, loadPlatformDAT } = await import(
-      "./datLoader"
-    );
-    const platforms = getPlatformsForFile(file.name);
+    const { loadPlatformDAT } = await import("./datLoader");
+
+    // Determine which platforms to check (uses disc detection for ISO files)
+    const platforms = await determinePlatforms(file, forcePlatform);
 
     // Validation stage
     onProgress?.(i + 1, validFiles.length, file.name, "validating", 0);
 
     let result: ValidationResult;
 
-    // If a platform is forced by the user, try that first but fall back to auto-detection
     if (forcePlatform) {
+      // User forced a specific platform - honor it and don't fall back
       try {
         const platformEntries = await loadPlatformDAT(forcePlatform);
         const datSource = getDATSource(forcePlatform);
-        const forcedResult = validateROM(
-          file,
-          hashes,
-          platformEntries,
-          datSource,
-        );
-
-        // If we found a match with the forced platform, use it
-        if (forcedResult.status !== "unknown") {
-          result = forcedResult;
-        } else {
-          // No match with forced platform, fall back to automatic detection
-          console.log(
-            `No match found for ${file.name} with forced platform ${forcePlatform}, falling back to auto-detection`,
-          );
-
-          if (platforms.length > 0) {
-            // Continue with normal auto-detection logic
-            if (platforms.length > 1) {
-              const mostLikelyPlatform = detectPlatformFromName(
-                file.name,
-                file.size,
-              );
-
-              // Reorder platforms to check the most likely one first
-              const orderedPlatforms = platforms.includes(mostLikelyPlatform)
-                ? [
-                    mostLikelyPlatform,
-                    ...platforms.filter((p) => p !== mostLikelyPlatform),
-                  ]
-                : platforms;
-
-              result = { status: "unknown" } as ValidationResult;
-
-              // Try platforms one by one until we find a match
-              for (const platform of orderedPlatforms) {
-                const platformEntries = await loadPlatformDAT(platform);
-                const datSource = getDATSource(platform);
-                const platformResult = validateROM(
-                  file,
-                  hashes,
-                  platformEntries,
-                  datSource,
-                );
-
-                if (platformResult.status !== "unknown") {
-                  result = platformResult;
-                  break; // Found a match, stop checking other platforms
-                }
-              }
-
-              // Continue with existing fallback logic...
-              if (result.status === "unknown") {
-                const ext = file.name
-                  .toLowerCase()
-                  .substring(file.name.lastIndexOf("."));
-
-                let fallbackPlatforms: string[] = [];
-
-                if (ext === ".iso") {
-                  fallbackPlatforms = [
-                    "PlayStation 2",
-                    "Wii",
-                    "PSP",
-                    "GameCube",
-                  ];
-                } else if (ext === ".bin") {
-                  fallbackPlatforms = [
-                    "PlayStation",
-                    "Dreamcast",
-                    "PlayStation 2",
-                  ];
-                }
-
-                if (fallbackPlatforms.length > 0) {
-                  const uncheckedPlatforms = fallbackPlatforms.filter(
-                    (p) => !orderedPlatforms.includes(p),
-                  );
-
-                  for (const platform of uncheckedPlatforms) {
-                    const fallbackEntries = await loadPlatformDAT(platform);
-                    const datSource = getDATSource(platform);
-                    const fallbackResult = validateROM(
-                      file,
-                      hashes,
-                      fallbackEntries,
-                      datSource,
-                    );
-
-                    if (fallbackResult.status !== "unknown") {
-                      result = fallbackResult;
-                      break;
-                    }
-                  }
-                }
-              }
-
-              if (result.status === "unknown") {
-                const fallbackEntries = await loadPlatformDAT(
-                  orderedPlatforms[0],
-                );
-                const datSource = getDATSource(orderedPlatforms[0]);
-                result = validateROM(file, hashes, fallbackEntries, datSource);
-              }
-            } else {
-              // Single platform, load and validate normally
-              const platformEntries = await loadPlatformDAT(platforms[0]);
-              const datSource = getDATSource(platforms[0]);
-              result = validateROM(file, hashes, platformEntries, datSource);
-            }
-          } else {
-            // Fallback to all DATs if platform detection fails
-            const platformEntries = await loadDATFiles();
-            result = validateROM(file, hashes, platformEntries, "Mixed");
-          }
-        }
+        result = validateROM(file, hashes, platformEntries, datSource);
       } catch (error) {
         console.error(`Error loading forced platform ${forcePlatform}:`, error);
-        // Fall back to automatic detection if forced platform fails to load
-        result = { status: "unknown" } as ValidationResult;
+        // Return unknown result instead of falling back
+        result = {
+          filename: file.name,
+          originalName: file.name,
+          status: "unknown",
+          size: file.size,
+          hashes,
+          issues: [
+            `Failed to load DAT for forced platform: ${forcePlatform}`,
+            error instanceof Error ? error.message : String(error),
+          ],
+          file,
+        };
       }
     } else if (platforms.length > 0) {
       // For multi-platform formats, try the most likely platform first based on size/name

@@ -18,6 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { toast } from "sonner";
 import {
   CheckCircle,
   XCircle,
@@ -110,20 +111,18 @@ export default function ValidationResults() {
 
   const handleApplyRenames = async () => {
     if (filesToRename.length === 0) {
-      alert("No files need renaming.");
+      toast.info("No files need renaming.");
       return;
     }
 
     try {
       for (const result of filesToRename) {
         if (result.file && result.suggestedName) {
-          // Create a new File object with the suggested name
           const renamedFile = new File([result.file], result.suggestedName, {
             type: result.file.type,
             lastModified: result.file.lastModified,
           });
 
-          // Trigger download
           const url = URL.createObjectURL(renamedFile);
           const link = document.createElement("a");
           link.href = url;
@@ -133,23 +132,22 @@ export default function ValidationResults() {
           document.body.removeChild(link);
           URL.revokeObjectURL(url);
 
-          // Small delay between downloads to avoid browser blocking
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
 
-      alert(
+      toast.success(
         `Successfully initiated downloads for ${filesToRename.length} renamed files.`,
       );
     } catch (error) {
       console.error("Error downloading renamed files:", error);
-      alert("Error downloading renamed files. Please try again.");
+      toast.error("Error downloading renamed files. Please try again.");
     }
   };
 
   const handleDownloadReport = () => {
     if (!summary || results.length === 0) {
-      alert("No validation results to export.");
+      toast.info("No validation results to export.");
       return;
     }
 
@@ -252,13 +250,13 @@ export default function ValidationResults() {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error generating report:", error);
-      alert("Error generating report. Please try again.");
+      toast.error("Error generating report. Please try again.");
     }
   };
 
   const handleExportUnknownList = () => {
     if (unknownFiles.length === 0) {
-      alert("No unknown files to export.");
+      toast.info("No unknown files to export.");
       return;
     }
 
@@ -325,7 +323,7 @@ export default function ValidationResults() {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error exporting unknown list:", error);
-      alert("Error exporting unknown list. Please try again.");
+      toast.error("Error exporting unknown list. Please try again.");
     }
   };
 
@@ -385,17 +383,20 @@ export default function ValidationResults() {
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      // You could add a toast notification here if you have one
-      console.log("Copied to clipboard:", text);
+      toast.success("Copied to clipboard", {
+        description: text.length > 50 ? `${text.substring(0, 50)}...` : text,
+      });
     } catch (err) {
       console.error("Failed to copy to clipboard:", err);
-      // Fallback for older browsers
       const textArea = document.createElement("textarea");
       textArea.value = text;
       document.body.appendChild(textArea);
       textArea.select();
       document.execCommand("copy");
       document.body.removeChild(textArea);
+      toast.success("Copied to clipboard", {
+        description: text.length > 50 ? `${text.substring(0, 50)}...` : text,
+      });
     }
   };
 
@@ -542,7 +543,7 @@ export default function ValidationResults() {
                       </div>
 
                       {result.originalName !== result.filename && (
-                        <p className="text-muted-foreground mb-1 text-sm break-words">
+                        <p className="text-muted-foreground mb-1 text-sm wrap-break-word">
                           Original: {result.originalName}
                         </p>
                       )}
@@ -551,7 +552,7 @@ export default function ValidationResults() {
                         {result.platform && result.platform !== "unknown" && (
                           <span className="flex items-center gap-1">
                             <HardDrive className="h-3 w-3" />
-                            <span className="break-words">
+                            <span className="wrap-break-word">
                               {result.platform}
                             </span>
                           </span>
@@ -610,7 +611,7 @@ export default function ValidationResults() {
                             <FileText className="h-5 w-5" />
                             File Details
                           </DialogTitle>
-                          <DialogDescription className="break-words">
+                          <DialogDescription className="wrap-break-word">
                             Detailed information about {result.filename}
                           </DialogDescription>
                         </DialogHeader>
@@ -778,7 +779,7 @@ export default function ValidationResults() {
                                     key={idx}
                                     className="flex items-start gap-2 text-sm"
                                   >
-                                    <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-500" />
+                                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
                                     <span className="text-red-700 dark:text-red-300">
                                       {issue}
                                     </span>
@@ -809,7 +810,7 @@ export default function ValidationResults() {
                             <Hash className="h-5 w-5" />
                             File Hashes
                           </DialogTitle>
-                          <DialogDescription className="break-words">
+                          <DialogDescription className="wrap-break-word">
                             Calculated hashes for {result.filename}
                           </DialogDescription>
                         </DialogHeader>
