@@ -1,156 +1,45 @@
 # Auto ROM Validator Web
 
-A modern web application for validating ROM files using No-Intro and Redump database DAT files. This is a complete rewrite of the original Python CLI tool with enhanced features and a user-friendly web interface.
+Validate ROM files against No-Intro and Redump databases directly in your browser.
 
-## ✨ Features
+## Features
 
-- **Complete Client-side Processing**: All files are processed locally in your browser for privacy
-- **Smart Platform Detection**: Intelligent size-based and filename-based platform detection
-- **Optimized Performance**: Sequential DAT loading with early exit on match detection
-- **Multiple Platform Support**: Nintendo, Sony, Sega, and more
-- **Enhanced Web Features**: Modern UI with drag-and-drop, progress tracking, and interactive results
-- **Encrypted DAT Support**: Bundled encrypted Nintendo DS DATs for comprehensive validation
-- **Cross-Platform Validation**: Automatic PlayStation format fallback for edge cases
-- **Drag & Drop Interface**: Modern, responsive UI with shadcn/ui components
-- **Manual Platform Selection**: Optional platform override for faster validation when you know the target system
-- **Enhanced Progress Tracking**: Granular real-time progress with file-by-file status, time estimates, and detailed validation stages
-- **Persistent Progress Display**: Progress indicator remains visible throughout validation workflow with smart state management
-- **Comprehensive Clear Functions**: Multiple clear options with specific behaviors for optimal workflow control
-- **Auto-Scroll Navigation**: Automatic scrolling to keep relevant content visible during file upload and validation
-- **Improved Visual Consistency**: Unified theming using shadcn color tokens with proper hover states and responsive design
-- **Hash Transparency**: View calculated MD5, SHA-1, and CRC32 hashes for all processed files with copy-to-clipboard functionality
-- **Detailed File Information**: Comprehensive file details including platform, region, and DAT source with interactive modals
-- **DAT Source Links**: Clickable badges linking to No-Intro and Redump official websites
-- **Mobile-Responsive Design**: Optimized interface for desktop and mobile devices with touch-friendly interactions
-- **DAT Browser**: Browse and search cached DAT files with built-in viewer and accordion interface
-- **Custom DAT Upload**: Upload and use your own DAT files alongside official databases
-- **Advanced Cache Management**: Intelligent memory vs persistent storage with transparent cache status reporting
-- **Developer Tools**: Comprehensive cache status, browsing, and management interface with clear source identification
+- **Private** — All processing happens locally. Your ROMs never leave your device.
+- **Smart Detection** — Automatically identifies platforms from file size and filename.
+- **Fast** — Sequential DAT loading with caching for repeated validations.
+- **Cross-Platform** — Supports Nintendo, Sony, Sega, and more.
 
-## 🎮 Supported Platforms
+## Supported Platforms
 
-### Nintendo Handheld Platforms (No-Intro DATs)
+| Platform           | Extensions             | Database |
+| ------------------ | ---------------------- | -------- |
+| Game Boy           | .gb                    | No-Intro |
+| Game Boy Color     | .gbc                   | No-Intro |
+| Game Boy Advance   | .gba                   | No-Intro |
+| Nintendo DS        | .nds                   | No-Intro |
+| Nintendo 3DS       | .3ds                   | No-Intro |
+| NES                | .nes                   | No-Intro |
+| SNES               | .smc, .sfc             | No-Intro |
+| Nintendo 64        | .n64, .z64             | No-Intro |
+| GameCube           | .iso, .gcm, .ciso      | Redump   |
+| Wii                | .iso, .wbfs            | Redump   |
+| PlayStation        | .bin, .cue             | Redump   |
+| PlayStation 2      | .iso, .bin, .cue       | Redump   |
+| PSP                | .iso, .cso, .pbp       | No-Intro |
+| Genesis/Mega Drive | .md, .gen, .smd        | No-Intro |
+| Dreamcast          | .bin, .cue, .cdi, .gdi | Redump   |
 
-- **Game Boy** (.gb)
-- **Game Boy Color** (.gbc)
-- **Game Boy Advance** (.gba)
-- **Nintendo DS** (.nds)
-- **Nintendo DS Download Play** (.nds)
-- **Nintendo DSi** (.nds)
-- **Nintendo 3DS** (.3ds)
+## Usage
 
-### Nintendo Console Platforms (No-Intro DATs)
+1. Open the app in your browser
+2. Drag and drop ROM files (or click to select)
+3. View validation results
 
-- **Nintendo Entertainment System** (.nes)
-- **Super Nintendo Entertainment System** (.smc, .sfc)
-- **Nintendo 64** (.n64, .z64)
+## Privacy
 
-### Nintendo Disc Platforms (Redump DATs)
+100% client-side. No files are uploaded to any server.
 
-- **GameCube** (.iso, .gcm, .ciso)
-- **Wii** (.iso, .wbfs)
-
-### Sony Platforms
-
-- **PlayStation** (.bin/.cue) - Redump DATs
-- **PlayStation 2** (.iso, .bin/.cue) - Redump DATs
-- **PlayStation Portable (PSP)** (.iso, .cso, .pbp) - No-Intro DATs
-
-### Sega Platforms
-
-- **Sega Genesis / Mega Drive** (.md, .gen, .smd) - No-Intro DATs
-- **Sega Dreamcast** (.bin/.cue, .cdi, .gdi) - Redump DATs
-
-## 🔧 DAT File Configuration
-
-This project uses a similar approach to the original CLI version but with enhanced web-specific optimizations and features.
-
-### DAT Sources
-
-- **Public DATs**: No-Intro and Redump DATs fetched from Libretro's GitHub repository in ClrMamePro format (`https://raw.githubusercontent.com/libretro/libretro-database/master/`)
-- **Encrypted DATs**: Bundled locally in XML format for special access content (Nintendo DS Encrypted) - only loaded when needed for performance
-- **Custom DATs**: Upload your own DAT files in XML or ClrMamePro format for specialized collections
-- **Format Support**: Automatic detection and parsing of both XML and ClrMamePro DAT formats
-
-### Extension Mapping
-
-The system automatically detects platforms based on file extensions with intelligent fallbacks:
-
-```typescript
-".nds": ["Nintendo DS", "Nintendo DS Download Play", "Nintendo DSi"]
-".gba": "Game Boy Advance"
-".gb": "Game Boy"
-".gbc": "Game Boy Color"
-".iso": ["PlayStation 2", "Wii", "PSP", "GameCube"]  // Smart size-based detection
-".cue/.bin": ["PlayStation", "PlayStation 2"] // PlayStation format detection
-```
-
-### Smart Platform Detection
-
-**Automatic Detection (Default)**: The system intelligently determines the most likely platform(s) for each file:
-
-- **Size-based Detection**:
-  - **ISO files**: PlayStation 2 (>4.5GB dual-layer) → Wii (800MB-4.5GB) → GameCube (200-800MB) → PSP (<200MB)
-  - **CD formats**: Conservative PlayStation detection with PS2 fallback for large files
-- **Filename Hints**: Platform keywords ("gc", "ps2", "wii", "psp") take priority over size detection
-- **Sequential Validation**: Downloads and checks most likely platform first, stops on match
-- **Cross-Platform Fallback**: PlayStation formats try both PS1 and PS2 DATs if needed
-
-**Manual Platform Selection (Optional)**: Users can override automatic detection by selecting a specific platform:
-
-- **Performance Boost**: Try the chosen platform first for maximum speed
-- **Smart Fallback**: If no match is found, automatically falls back to intelligent detection
-- **Accuracy Improvement**: Perfect for users who know their ROM collection's platform
-- **Batch Processing**: Ideal for validating multiple files from the same system
-- **Zero Risk**: Never miss a valid ROM due to wrong platform selection
-
-**Historical Accuracy**:
-
-- **PlayStation 1**: Never used ISO format - only CD-ROM (.cue/.bin pairs)
-- **PlayStation 2**: Primarily DVD format (.iso), some early titles on CD (.cue/.bin)
-- **Platform Specific**: Each console's actual capabilities and distribution methods reflected
-
-### Special Handling
-
-- **Nintendo DS**: Intelligent DAT selection with bundled encrypted DAT tried first, automatic fallback to unencrypted libretro version for comprehensive coverage
-- **Unified Platform Selection**: Nintendo DS appears as single option in UI while maintaining separate encrypted/unencrypted DAT support in developer tools
-- **Multi-platform files**: `.iso`, `.bin` & more files use intelligent size and filename-based platform detection
-- **Performance Optimized**: Most files match on first platform attempt, avoiding unnecessary downloads
-- **Smart Caching**: Multi-level caching system for optimal performance:
-  - **Memory Cache**: Fast in-memory storage for current session (active DATs only)
-  - **Persistent Cache**: localStorage with 24-hour expiry for repeated visits (downloaded DATs)
-  - **Bundled DATs**: Only loaded when needed, not preloaded for better performance
-  - **Custom DATs**: Uploaded files cached and persist across sessions
-  - **Automatic Cleanup**: Cache versioning prevents stale data issues
-
-## 🚀 Project Structure
-
-```text
-/
-├── public/
-│   ├── dats/                           # Bundled encrypted DAT files
-│   │   └── Nintendo - Nintendo DS (Encrypted).dat
-│   └── favicon.svg
-├── src/
-│   ├── components/                    # React components
-│   │   ├── ui/                        # shadcn/ui components
-│   │   ├── FileUpload.tsx             # Main file upload interface
-│   │   ├── ValidationResults.tsx      # Results display
-│   │   ├── ValidationProgress.tsx     # Progress tracking
-│   │   └── Header.tsx                 # Navigation header
-│   ├── layouts/
-│   │   └── Layout.astro              # Base layout
-│   ├── pages/
-│   │   ├── index.astro               # Main validation page
-│   │   ├── about.astro               # About page
-│   │   └── robots.txt.ts             # SEO robots.txt
-│   └── utils/
-│       ├── romValidator.ts           # Core validation logic
-│       └── datLoader.ts              # DAT file management (CLI-compatible)
-└── package.json
-```
-
-## 🧞 Commands
+## Development Commands
 
 All commands are run from the root of the project:
 
@@ -167,214 +56,17 @@ All commands are run from the root of the project:
 | `npm run astro -- --help` | Get help using the Astro CLI                     |
 | `npm run format`          | Format all project files with prettier           |
 
-## 🛠️ Development
+## Contributing
 
-### Prerequisites
+Open issues or PRs on [GitHub](https://github.com/RP2/rom-validate-web).
 
-- Node.js 18+
-- npm or yarn
-
-### Setup
-
-```bash
-git clone https://github.com/RP2/rom-validate-web.git
-cd rom-validate-web
-npm install
-npm run dev
-```
-
-### Adding New Platforms
-
-To add support for new platforms, update the `PLATFORMS` and `EXTENSION_MAP` in `src/utils/datLoader.ts`:
-
-```typescript
-// Add new platform
-PLATFORMS = {
-  ...existing,
-  "New Platform": "metadat/no-intro/New - Platform.dat",
-};
-
-// Add extension mapping
-EXTENSION_MAP = {
-  ...existing,
-  ".ext": "New Platform",
-};
-```
-
-## 🔒 Privacy & Security
-
-- **Complete Privacy**: All file processing happens locally in your browser - files never leave your computer
-- **No File Upload**: ROM files are never sent to any server
-- **Custom DATs Stay Local**: Uploaded custom DAT files are processed and cached entirely in your browser's local storage - never transmitted to any server
-- **No Data Collection**: No user tracking, personal data storage, or cookies beyond essential DAT caching and theme preferences
-- **Local Theme Storage**: Theme preferences (light/dark/system) are stored locally on your device only and never transmitted to any server
-- **Smart Caching**: DAT files cached locally with 24-hour expiry to minimize external requests
-- **Cache Management**: Built-in cache status and cleanup tools in developer settings
-- **Browser Compatibility**: Graceful fallback for browsers with limited crypto support
-- **Open Source**: Full transparency with code available for review and local deployment
-
-## 📋 Validation Process
-
-1. **File Detection**: Platform detected from file extension with intelligent size/filename analysis
-2. **Smart Platform Prioritization**: Most likely platform determined first to minimize DAT downloads
-3. **Hash Calculation**: MD5, SHA-1, and CRC32 calculated client-side
-4. **Sequential DAT Loading**: Loads and checks most likely platform first, stops on match
-5. **Fallback Validation**: If no match, tries remaining platforms with cross-platform PlayStation support
-6. **Results**: Detailed validation results with renaming suggestions and platform detection info
-
-## 📱 User Interface Features
-
-### File Upload & Platform Selection
-
-- **Drag & Drop Interface**: Modern, intuitive file upload with visual feedback
-- **Platform Override**: Optional dropdown to manually select target platform for faster validation
-- **Auto-Detection Info**: Clear explanation of how automatic platform detection works
-- **Smart Recommendations**: UI guides users on when to use manual vs automatic detection
-- **Batch Optimization**: Perfect for validating collections from known platforms
-
-### Enhanced User Experience Features
-
-- **Granular Progress Tracking**: Real-time file-by-file validation progress with detailed stages (initializing, hashing, loading DATs, validating, completed)
-- **Persistent Progress Display**: Progress indicator remains visible throughout the entire validation workflow for better user experience
-- **Smart State Management**: Comprehensive clear functions with specific behaviors (clear all files, clear progress only, clear results)
-- **Auto-Scroll Navigation**: Automatic scrolling to keep relevant sections visible during file upload and validation completion
-- **Comprehensive Clear Options**: Multiple clear buttons with distinct functions:
-  - **Clear All**: Removes uploaded files and resets all state
-  - **Clear Progress**: Resets validation progress while keeping uploaded files
-  - **Clear Results**: Removes validation results with labeled button for clarity
-- **Enhanced Visual Feedback**: Consistent theming using shadcn design tokens with proper hover states and responsive behavior
-- **Optimized Animations**: Smooth transitions with proper overflow handling to prevent horizontal scrollbars during progress updates
-- **Time Estimation**: Real-time validation time tracking with estimated completion times for better user planning
-
-- **Status Filtering**: Filter results by validation status (Valid, Unknown, Renamed, All)
-- **Interactive File Details**: Click the eye icon to view comprehensive file information including:
-  - File size, modification date, and validation status
-  - Platform and region information
-  - Matched ROM database entry details
-  - DAT source information with direct links to No-Intro/Redump websites
-  - Suggested filename corrections
-  - Issue reporting and troubleshooting hints
-
-### Hash Information
-
-- **Hash Transparency**: Click the hash icon to view all calculated hashes
-- **Copy to Clipboard**: One-click copying of individual hash values (CRC32, MD5, SHA-1)
-- **Mobile-Optimized**: Responsive design with touch-friendly buttons and proper text wrapping
-
-### Validation Results Display
-
-- **Comprehensive Reports**: Download detailed validation reports in text format
-- **Unknown ROM Lists**: Export lists of unidentified files with hashes for manual research
-- **Batch Renaming**: Download files with corrected names based on database matches
-- **Mobile-Responsive**: All action buttons adapt to mobile screens with appropriate sizing
-
-### User Experience
-
-- **Responsive Design**: Mobile-first design that works seamlessly on all device sizes
-- **Modal Dialogs**: Clean, accessible dialogs for detailed information display
-- **Touch-Friendly**: Optimized button sizes and interactions for mobile devices
-- **Keyboard Accessible**: Full keyboard navigation support for accessibility
-
-## 🗂️ DAT Management & Caching System
-
-The application features a sophisticated DAT management system with performance-focused caching:
-
-### Cache Architecture
-
-1. **Memory Cache**: Active DATs loaded during current session for immediate validation
-2. **Persistent Cache**: Downloaded DATs stored in localStorage (24-hour expiry)
-3. **Bundled DATs**: Only loaded when specifically needed (e.g., DS file validation)
-4. **Custom DATs**: User-uploaded files cached persistently across sessions
-
-### Developer Tools & DAT Browser
-
-Access comprehensive DAT management via the settings icon (⚙️) in the header:
-
-#### Cache Status
-
-- **Bundled**: Available bundled DATs (count from configuration, not storage-dependent)
-- **Memory**: Currently loaded DATs (active in current session for immediate validation)
-- **Cached**: Persistently stored DATs (downloaded libretro and custom uploads)
-- **Cache Size**: Total storage usage with automatic cleanup and accurate size calculation
-
-#### DAT Browser
-
-- **Accordion Interface**: Clean, expandable list powered by shadcn/ui components with consistent hover effects and alignment
-- **Source Identification**: Clear distinction between bundled, libretro, and custom DATs with consistent labeling
-- **Nintendo DS Support**: Both encrypted and unencrypted DS DATs appear separately for browsing when available
-- **Entry Counts**: Number of ROM entries in each DAT for reference and validation scope
-- **Built-in Viewer**: Click any DAT to open in a new tab with formatted display for easy browsing
-- **Search Support**: Use browser's Ctrl+F to find specific ROMs within DAT files
-- **Consistent Browsing**: Bundled DATs appear in browse list when user has cached content for unified experience
-- **Smart Display Logic**: Memory-first loading ensures optimal performance while maintaining UI consistency
-
-#### Cache Management
-
-- **Upload Custom DATs**: Add your own XML or ClrMamePro format DAT files
-- **Clear Cache**: Remove all downloaded and custom DATs (bundled DATs unaffected)
-- **Confirmation Dialogs**: Prevent accidental cache clearing with detailed warnings
-
-### Performance Benefits
-
-- **Lazy Loading**: Bundled encrypted DATs only loaded when DS files are validated, not preloaded
-- **Memory-First Strategy**: Bundled DATs prioritize memory cache over localStorage for optimal speed
-- **Smart Prioritization**: Most likely platform DATs loaded first with early exit on match
-- **Session Persistence**: Memory cache maintains state during validation sessions without repeated loads
-- **Consistent UX**: Bundled DATs appear in browse interface when user has other cached content
-- **Storage Efficiency**: Automatic cleanup of expired data with version control and cache validation
-- **Bandwidth Optimization**: Reduces repeated downloads by ~70% for common validations with intelligent caching
-- **Cache Transparency**: Clear console logging distinguishes between cached data usage and fresh downloads/loads
-
-## 🤝 Contributing
-
-This project is a modern web rewrite of the original [CLI ROM Validator](https://github.com/RP2/auto-rom-validator). When adding features:
-
-1. Follow TypeScript best practices and maintain type safety
-2. Test platform detection with the included test scripts
-3. Follow existing component structure and design patterns
-4. Ensure mobile-responsive design with shadcn/ui components
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-**Drag and Drop Not Working:**
-
-- Ensure you're dragging files directly over the upload area (should show visual feedback)
-- Try dragging from different file managers (Explorer, Finder, Nautilus)
-- Some browsers may require explicit permissions for file access
-- Check browser console for "Drag enter detected" and "Files dropped" messages
-- Try using the "Select Files" button as an alternative
-- Ensure JavaScript is enabled in your browser
-
-**Validation Errors:**
-
-- Check browser console for detailed error messages
-- Some browsers have limited Web Crypto API support
-- Clear DAT cache using developer tools (⚙️ icon) if validation fails repeatedly
-- "XML Parsing Error": Automatically handled - app supports both XML and ClrMamePro DAT formats
-
-**Performance Issues:**
-
-- Large ROM files (>1GB) may take time to process
-- Close other browser tabs to free up memory
-- Check cache status in developer tools to monitor storage usage
-- For multi-platform formats (.iso), the system now prioritizes the most likely platform first
-
-**Platform Detection Issues:**
-
-- If platform appears as "unknown", check that the file extension is supported
-- Size-based detection works best with uncompressed files
-- Filename hints ("gc", "ps2", "psp") help improve detection accuracy
-- PlayStation cross-platform fallback handles edge cases automatically
-
-## 📄 License
+## License
 
 [MIT](LICENSE)
 
-## 🔗 Related Projects
+## Related
 
-- [Auto ROM Validator CLI](https://github.com/RP2/auto-rom-validator) - Original Python command-line version
-- [No-Intro](https://no-intro.org/) - Cartridge-based ROM preservation database
-- [Redump](http://redump.org/) - Optical disc preservation database
-- [Libretro Database](https://github.com/libretro/libretro-database) - Repository hosting No-Intro and Redump DAT files
+- [Auto ROM Validator CLI](https://github.com/RP2/auto-rom-validator) — Original Python version
+- [No-Intro](https://no-intro.org/) — Cartridge ROM database
+- [Redump](http://redump.org/) — Optical disc database
+- [Libretro Database](https://github.com/libretro/libretro-database) — DAT file source
