@@ -6,12 +6,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -22,13 +16,24 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
+import ValidationSettings from "./ValidationSettings";
+import DATSettings from "./DATSettings";
 
 import { Moon, Sun, Menu, Github, Settings } from "lucide-react";
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [devToolsOpen, setDevToolsOpen] = React.useState(false);
+  const [settingsDialogOpen, setSettingsDialogOpen] = React.useState(false);
+  const [datSettingsDialogOpen, setDatSettingsDialogOpen] =
+    React.useState(false);
   const [cachedDATs, setCachedDATs] = React.useState<
     Array<{ platform: string; source: string; entryCount: number }>
   >([]);
@@ -322,86 +327,41 @@ export default function Header() {
                 <Button
                   variant="ghost"
                   className="cursor-pointer touch-manipulation justify-start px-3"
-                  onClick={handleShowCacheStatus}
+                  onClick={() => {
+                    setDevToolsOpen(false);
+                    setDatSettingsDialogOpen(true);
+                  }}
                 >
-                  Cache Status
+                  DAT Settings
                 </Button>
-                <AlertDialog
-                  open={clearCacheDialogOpen}
-                  onOpenChange={setClearCacheDialogOpen}
-                >
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="cursor-pointer touch-manipulation justify-start px-3"
-                    >
-                      Clear DAT Cache
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Clear DAT Cache?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will remove all downloaded Libretro DAT files,
-                        uploaded custom DAT files, and cached validation data.
-                        Bundled DAT files will remain available and are not
-                        affected.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleClearCache}>
-                        Clear Cache
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
                 <Button
                   variant="ghost"
                   className="cursor-pointer touch-manipulation justify-start px-3"
-                  onClick={handleUploadCustomDAT}
+                  onClick={() => {
+                    setDevToolsOpen(false);
+                    setSettingsDialogOpen(true);
+                  }}
                 >
-                  Upload Custom DAT
+                  Validation Settings
                 </Button>
-                {cachedDATs.length > 0 && (
-                  <Accordion type="single" collapsible className="w-full">
-                    <AccordionItem value="cached-dats" className="border-none">
-                      <AccordionTrigger className="hover:bg-accent hover:text-accent-foreground cursor-pointer px-3 py-2 text-sm font-medium hover:no-underline">
-                        Browse DATs ({cachedDATs.length})
-                      </AccordionTrigger>
-                      <AccordionContent className="pb-0">
-                        <div className="flex flex-col space-y-1">
-                          <div className="text-muted-foreground px-3 py-2 text-xs font-medium">
-                            Select DAT to browse:
-                          </div>
-                          {cachedDATs.map((dat) => (
-                            <Button
-                              key={`${dat.platform}-${dat.source}`}
-                              variant="ghost"
-                              size="sm"
-                              className="h-auto w-full cursor-pointer touch-manipulation justify-start px-3 py-2 text-xs"
-                              onClick={() =>
-                                handleBrowseDAT(dat.platform, dat.source)
-                              }
-                            >
-                              <div className="flex w-full min-w-0 flex-col items-start">
-                                <span className="w-full truncate text-left font-medium">
-                                  {dat.platform}
-                                </span>
-                                <span className="text-muted-foreground w-full truncate text-left">
-                                  {dat.source} • {dat.entryCount} entries
-                                </span>
-                              </div>
-                            </Button>
-                          ))}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
-                )}
               </div>
             </PopoverContent>
           </Popover>
+
+          {/* DAT Settings Dialog */}
+          <Dialog
+            open={datSettingsDialogOpen}
+            onOpenChange={setDatSettingsDialogOpen}
+          >
+            <DialogContent className="flex max-h-[85vh] w-[90vw] max-w-2xl flex-col overflow-hidden">
+              <DialogHeader>
+                <DialogTitle>DAT Settings</DialogTitle>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto pr-2">
+                <DATSettings />
+              </div>
+            </DialogContent>
+          </Dialog>
 
           <Popover open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <PopoverTrigger asChild className="md:hidden">
@@ -444,6 +404,21 @@ export default function Header() {
               </div>
             </PopoverContent>
           </Popover>
+
+          {/* Settings Dialog */}
+          <Dialog
+            open={settingsDialogOpen}
+            onOpenChange={setSettingsDialogOpen}
+          >
+            <DialogContent className="flex max-h-[85vh] w-[90vw] max-w-2xl flex-col overflow-hidden">
+              <DialogHeader>
+                <DialogTitle>Validation Settings</DialogTitle>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto pr-2">
+                <ValidationSettings />
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </header>

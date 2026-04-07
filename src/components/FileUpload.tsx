@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { validateROMs, type ValidationResult } from "@/utils/romValidator";
 import { getSupportedPlatforms } from "@/utils/datLoader";
+import { getParallelWorkerCount } from "@/utils/validationSettings";
 import ValidationProgress from "./ValidationProgress";
 import { toast } from "sonner";
 
@@ -420,7 +421,8 @@ export default function FileUpload() {
             }),
           );
         },
-        selectedPlatform !== "auto" ? selectedPlatform : undefined, // Pass selected platform if chosen
+        selectedPlatform !== "auto" ? selectedPlatform : undefined,
+        getParallelWorkerCount(),
       );
 
       // Mark all files as completed

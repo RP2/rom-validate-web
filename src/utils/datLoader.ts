@@ -265,19 +265,26 @@ export async function loadLibretroDAT(platform: string): Promise<DATEntry[]> {
   }
 }
 
-// Load DAT for a specific platform (tries encrypted bundled first for DS, then Libretro)
+// Load DAT for a specific platform (loads both encrypted and decrypted for DS)
 export async function loadPlatformDAT(platform: string): Promise<DATEntry[]> {
-  // For Nintendo DS, try encrypted version first if available
+  const allEntries: DATEntry[] = [];
+
+  // For Nintendo DS, load both encrypted (bundled) and decrypted (libretro)
   if (platform === "Nintendo DS") {
     const encryptedEntries = await loadBundledDAT(
       "Nintendo DS Encrypted (Bundled)",
     );
-    if (encryptedEntries.length > 0) {
-      return encryptedEntries;
+    allEntries.push(...encryptedEntries);
+
+    const decryptedEntries = await loadLibretroDAT("Nintendo DS");
+    allEntries.push(...decryptedEntries);
+
+    if (allEntries.length > 0) {
+      return allEntries;
     }
   }
 
-  // Try Libretro database
+  // Try Libretro database for other platforms
   return await loadLibretroDAT(platform);
 }
 
@@ -467,9 +474,7 @@ export async function getCachedDATs(): Promise<
     console.warn("Failed to get cached DATs:", error);
   }
 
-  // Now check bundled DATs - show them if in memory OR if user has other cached DATs
-  const hasOtherCachedDATs = cachedDATs.length > 0;
-
+  // Now check bundled DATs - always show them since they're built into the app
   for (const platform of Object.keys(BUNDLED_DATS)) {
     const memoryKey = `${platform}-bundled`;
 
@@ -479,7 +484,7 @@ export async function getCachedDATs(): Promise<
         ? "Nintendo DS (Encrypted)"
         : platform;
 
-    // Always show if in memory, or show if user has other cached DATs for consistency
+    // Show bundled DATs if in memory or localStorage
     if (datCache.has(memoryKey)) {
       const entries = datCache.get(memoryKey)!;
       cachedDATs.push({
@@ -487,8 +492,7 @@ export async function getCachedDATs(): Promise<
         source: "bundled",
         entryCount: entries.length,
       });
-    } else if (hasOtherCachedDATs) {
-      // Also check localStorage for bundled DATs when user has other cached content
+    } else {
       const cachedData = loadFromPersistentCache(platform, "bundled");
       if (cachedData) {
         cachedDATs.push({

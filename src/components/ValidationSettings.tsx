@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Card,
@@ -8,194 +8,51 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Settings,
-  Download,
-  RefreshCw,
-  HardDrive,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-} from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Settings, AlertTriangle } from "lucide-react";
+import { getStoredSettings, saveSettings } from "@/utils/validationSettings";
 
-interface Platform {
-  id: string;
-  name: string;
-  lastUpdated: string;
-  fileCount: number;
-  status: "available" | "downloading" | "updated" | "error";
-}
+const WORKER_OPTIONS = [
+  { value: "1", label: "1" },
+  { value: "2", label: "2" },
+  { value: "3", label: "3" },
+  { value: "4", label: "4 (Default)" },
+  { value: "5", label: "5" },
+  { value: "6", label: "6" },
+] as const;
 
 export default function ValidationSettings() {
-  const [platforms, setPlatforms] = useState<Platform[]>([
-    {
-      id: "nintendo-ds",
-      name: "Nintendo DS",
-      lastUpdated: "2024-01-15",
-      fileCount: 6757,
-      status: "available",
-    },
-    {
-      id: "nintendo-3ds",
-      name: "Nintendo 3DS",
-      lastUpdated: "2024-01-10",
-      fileCount: 2341,
-      status: "available",
-    },
-    {
-      id: "game-boy-advance",
-      name: "Game Boy Advance",
-      lastUpdated: "2023-12-20",
-      fileCount: 2847,
-      status: "available",
-    },
-    {
-      id: "nintendo-64",
-      name: "Nintendo 64",
-      lastUpdated: "2023-11-30",
-      fileCount: 388,
-      status: "available",
-    },
-  ]);
-
   const [settings, setSettings] = useState({
     autoRename: true,
     skipLargeFiles: false,
-    maxFileSize: 1024, // MB
+    maxFileSize: 1024,
     verboseOutput: false,
+    parallelWorkers: "4",
   });
 
-  const downloadDAT = async (platformId: string) => {
-    setPlatforms((prev) =>
-      prev.map((p) =>
-        p.id === platformId ? { ...p, status: "downloading" } : p,
-      ),
-    );
+  useEffect(() => {
+    const stored = getStoredSettings();
+    setSettings((prev) => ({ ...prev, ...stored }));
+  }, []);
 
-    try {
-      // Simulate download
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      setPlatforms((prev) =>
-        prev.map((p) =>
-          p.id === platformId
-            ? {
-                ...p,
-                status: "updated",
-                lastUpdated: new Date().toISOString().split("T")[0],
-              }
-            : p,
-        ),
-      );
-    } catch (error) {
-      setPlatforms((prev) =>
-        prev.map((p) => (p.id === platformId ? { ...p, status: "error" } : p)),
-      );
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "downloading":
-        return <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />;
-      case "updated":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case "error":
-        return <AlertTriangle className="h-4 w-4 text-red-500" />;
-      default:
-        return <Clock className="text-muted-foreground h-4 w-4" />;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      available: "secondary",
-      downloading: "default",
-      updated: "outline",
-      error: "destructive",
-    } as const;
-
-    const labels = {
-      available: "Available",
-      downloading: "Downloading...",
-      updated: "Updated",
-      error: "Error",
-    };
-
-    return (
-      <Badge variant={variants[status as keyof typeof variants] || "secondary"}>
-        {labels[status as keyof typeof labels] || status}
-      </Badge>
-    );
+  const updateSettings = (updates: Partial<typeof settings>) => {
+    setSettings((prev) => {
+      const newSettings = { ...prev, ...updates };
+      saveSettings(newSettings);
+      return newSettings;
+    });
   };
 
   return (
     <div className="space-y-6">
-      {/* DAT Files Management */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <HardDrive className="h-5 w-5" />
-            DAT Files Management
-          </CardTitle>
-          <CardDescription>
-            Download and manage validation databases for different platforms
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {platforms.map((platform) => (
-              <motion.div
-                key={platform.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="border-border flex items-center justify-between rounded-lg border p-4"
-              >
-                <div className="flex items-center gap-3">
-                  {getStatusIcon(platform.status)}
-                  <div>
-                    <h4 className="font-medium">{platform.name}</h4>
-                    <div className="text-muted-foreground mt-1 flex items-center gap-4 text-xs">
-                      <span>Last updated: {platform.lastUpdated}</span>
-                      <span>{platform.fileCount.toLocaleString()} files</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {getStatusBadge(platform.status)}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => downloadDAT(platform.id)}
-                    disabled={platform.status === "downloading"}
-                    className="flex items-center gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    {platform.status === "downloading"
-                      ? "Downloading..."
-                      : "Update"}
-                  </Button>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          <Alert className="mt-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              DAT files are downloaded from official No-Intro and Redump
-              databases via Libretro's repository. Large files may take several
-              minutes to download and process.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-
       {/* Validation Settings */}
       <Card>
         <CardHeader>
@@ -221,10 +78,7 @@ export default function ValidationSettings() {
                 variant={settings.autoRename ? "default" : "outline"}
                 size="sm"
                 onClick={() =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    autoRename: !prev.autoRename,
-                  }))
+                  updateSettings({ autoRename: !settings.autoRename })
                 }
               >
                 {settings.autoRename ? "Enabled" : "Disabled"}
@@ -244,10 +98,7 @@ export default function ValidationSettings() {
                   variant={settings.skipLargeFiles ? "default" : "outline"}
                   size="sm"
                   onClick={() =>
-                    setSettings((prev) => ({
-                      ...prev,
-                      skipLargeFiles: !prev.skipLargeFiles,
-                    }))
+                    updateSettings({ skipLargeFiles: !settings.skipLargeFiles })
                   }
                 >
                   {settings.skipLargeFiles ? "Enabled" : "Disabled"}
@@ -266,10 +117,9 @@ export default function ValidationSettings() {
                     type="number"
                     value={settings.maxFileSize}
                     onChange={(e) =>
-                      setSettings((prev) => ({
-                        ...prev,
+                      updateSettings({
                         maxFileSize: parseInt(e.target.value) || 1024,
-                      }))
+                      })
                     }
                     className="w-24"
                     min="1"
@@ -292,15 +142,46 @@ export default function ValidationSettings() {
                 variant={settings.verboseOutput ? "default" : "outline"}
                 size="sm"
                 onClick={() =>
-                  setSettings((prev) => ({
-                    ...prev,
-                    verboseOutput: !prev.verboseOutput,
-                  }))
+                  updateSettings({ verboseOutput: !settings.verboseOutput })
                 }
               >
                 {settings.verboseOutput ? "Enabled" : "Disabled"}
               </Button>
             </div>
+
+            {/* Parallel Processing */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-medium">Parallel Processing</h4>
+                <p className="text-muted-foreground text-sm">
+                  Process multiple files concurrently using Web Workers
+                </p>
+              </div>
+              <Select
+                value={settings.parallelWorkers}
+                onValueChange={(value) =>
+                  updateSettings({ parallelWorkers: value })
+                }
+              >
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {WORKER_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Alert className="bg-muted/50">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                Parallel processing runs entirely in your browser - no data is
+                sent to external servers. Higher worker counts use more memory.
+              </AlertDescription>
+            </Alert>
           </div>
         </CardContent>
       </Card>

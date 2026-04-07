@@ -1,8 +1,16 @@
 // Client-side ROM validation utilities
 
+import {
+  initializePool,
+  hashFileWithPool,
+  terminatePool,
+  type PooledHashResult,
+} from "../workers/workerPoolManager";
+
 // Web Worker singleton for hash calculation
 let hashWorker: Worker | null = null;
 let workerMessageId = 0;
+let currentWorkerCount = 0;
 const pendingOperations = new Map<
   string,
   {
@@ -126,10 +134,16 @@ function crc32(data: Uint8Array): string {
 
 // Calculate file hashes client-side with progress tracking using Web Worker
 // Uses streaming with 1MB chunks to handle files of any size without OOM
+// Can use parallel worker pool for batch processing multiple files concurrently
 export async function calculateFileHashes(
   file: File,
   onProgress?: (progress: number) => void,
+  parallelWorkers?: number,
 ): Promise<{ md5: string; sha1: string; crc32: string }> {
+  if (parallelWorkers && parallelWorkers > 1) {
+    return calculateFileHashesParallel(file, onProgress, parallelWorkers);
+  }
+
   const worker = getHashWorker();
   const fileId = `hash-${++workerMessageId}-${file.name}`;
 
@@ -146,6 +160,23 @@ export async function calculateFileHashes(
       fileId,
     });
   });
+}
+
+async function calculateFileHashesParallel(
+  file: File,
+  onProgress?: (progress: number) => void,
+  parallelWorkers?: number,
+): Promise<{ md5: string; sha1: string; crc32: string }> {
+  try {
+    const result: PooledHashResult = await hashFileWithPool(file, onProgress);
+    return {
+      md5: result.md5,
+      sha1: result.sha1,
+      crc32: result.crc32,
+    };
+  } catch (error) {
+    throw error instanceof Error ? error : new Error(String(error));
+  }
 }
 
 // Legacy synchronous hash calculation (kept for compatibility/fallback)
@@ -783,6 +814,7 @@ export async function validateROMs(
     fileProgress?: number,
   ) => void,
   forcePlatform?: string,
+  parallelWorkers?: number,
 ): Promise<ValidationResult[]> {
   const results: ValidationResult[] = [];
 
@@ -792,6 +824,54 @@ export async function validateROMs(
     return ext !== ".cue";
   });
 
+  // Initialize worker pool if parallel processing is enabled
+  const useParallel = parallelWorkers && parallelWorkers > 1;
+  if (useParallel) {
+    await initializePool({
+      workerCount: parallelWorkers,
+    });
+  }
+
+  try {
+    // Process files - either parallel or sequential
+    if (useParallel) {
+      await processFilesParallel(
+        validFiles,
+        results,
+        onProgress,
+        forcePlatform,
+        parallelWorkers,
+      );
+    } else {
+      await processFilesSequential(
+        validFiles,
+        results,
+        onProgress,
+        forcePlatform,
+      );
+    }
+  } finally {
+    // Clean up worker pool
+    if (useParallel) {
+      await terminatePool();
+    }
+  }
+
+  return results;
+}
+
+async function processFilesSequential(
+  validFiles: File[],
+  results: ValidationResult[],
+  onProgress?: (
+    current: number,
+    total: number,
+    currentFile: string,
+    stage: "hashing" | "loading-dats" | "validating",
+    fileProgress?: number,
+  ) => void,
+  forcePlatform?: string,
+): Promise<void> {
   for (let i = 0; i < validFiles.length; i++) {
     const file = validFiles[i];
 
@@ -808,136 +888,212 @@ export async function validateROMs(
       );
     });
 
-    // Loading DATs stage
-    onProgress?.(i + 1, validFiles.length, file.name, "loading-dats", 100);
+    const result = await processSingleFileValidation(
+      file,
+      hashes,
+      onProgress,
+      i,
+      validFiles.length,
+      forcePlatform,
+    );
+    results.push(result);
+  }
+}
 
-    const { loadPlatformDAT } = await import("./datLoader");
+async function processFilesParallel(
+  validFiles: File[],
+  results: ValidationResult[],
+  onProgress?: (
+    current: number,
+    total: number,
+    currentFile: string,
+    stage: "hashing" | "loading-dats" | "validating",
+    fileProgress?: number,
+  ) => void,
+  forcePlatform?: string,
+  workerCount: number = 4,
+): Promise<void> {
+  const batchSize = Math.min(validFiles.length, workerCount);
+  let processedCount = 0;
 
-    // Determine which platforms to check (uses disc detection for ISO files)
-    const platforms = await determinePlatforms(file, forcePlatform);
+  while (processedCount < validFiles.length) {
+    const batch = validFiles.slice(processedCount, processedCount + batchSize);
 
-    // Validation stage
-    onProgress?.(i + 1, validFiles.length, file.name, "validating", 0);
+    const batchPromises = batch.map(async (file, batchIndex) => {
+      const globalIndex = processedCount + batchIndex;
 
-    let result: ValidationResult;
+      onProgress?.(globalIndex + 1, validFiles.length, file.name, "hashing", 0);
 
-    if (forcePlatform) {
-      // User forced a specific platform - honor it and don't fall back
-      try {
-        const platformEntries = await loadPlatformDAT(forcePlatform);
-        const datSource = getDATSource(forcePlatform);
-        result = validateROM(file, hashes, platformEntries, datSource);
-      } catch (error) {
-        console.error(`Error loading forced platform ${forcePlatform}:`, error);
-        // Return unknown result instead of falling back
-        result = {
-          filename: file.name,
-          originalName: file.name,
-          status: "unknown",
-          size: file.size,
-          hashes,
-          issues: [
-            `Failed to load DAT for forced platform: ${forcePlatform}`,
-            error instanceof Error ? error.message : String(error),
-          ],
-          file,
-        };
-      }
-    } else if (platforms.length > 0) {
-      // For multi-platform formats, try the most likely platform first based on size/name
-      if (platforms.length > 1) {
-        const mostLikelyPlatform = detectPlatformFromName(file.name, file.size);
-
-        // Reorder platforms to check the most likely one first
-        const orderedPlatforms = platforms.includes(mostLikelyPlatform)
-          ? [
-              mostLikelyPlatform,
-              ...platforms.filter((p) => p !== mostLikelyPlatform),
-            ]
-          : platforms;
-
-        result = { status: "unknown" } as ValidationResult;
-
-        // Try platforms one by one until we find a match
-        for (const platform of orderedPlatforms) {
-          const platformEntries = await loadPlatformDAT(platform);
-          const datSource = getDATSource(platform);
-          const platformResult = validateROM(
-            file,
-            hashes,
-            platformEntries,
-            datSource,
+      const hashes = await calculateFileHashes(
+        file,
+        (hashProgress) => {
+          onProgress?.(
+            globalIndex + 1,
+            validFiles.length,
+            file.name,
+            "hashing",
+            hashProgress,
           );
+        },
+        workerCount,
+      );
 
-          if (platformResult.status !== "unknown") {
-            result = platformResult;
-            break; // Found a match, stop checking other platforms
-          }
+      onProgress?.(
+        globalIndex + 1,
+        validFiles.length,
+        file.name,
+        "loading-dats",
+        100,
+      );
+
+      const result = await processSingleFileValidation(
+        file,
+        hashes,
+        onProgress,
+        globalIndex,
+        validFiles.length,
+        forcePlatform,
+      );
+      return result;
+    });
+
+    const batchResults = await Promise.all(batchPromises);
+    results.push(...batchResults);
+    processedCount += batch.length;
+  }
+}
+
+async function processSingleFileValidation(
+  file: File,
+  hashes: { md5: string; sha1: string; crc32: string },
+  onProgress?: (
+    current: number,
+    total: number,
+    currentFile: string,
+    stage: "hashing" | "loading-dats" | "validating",
+    fileProgress?: number,
+  ) => void,
+  currentIndex: number = 0,
+  totalFiles: number = 1,
+  forcePlatform?: string,
+): Promise<ValidationResult> {
+  // Loading DATs stage
+  onProgress?.(currentIndex + 1, totalFiles, file.name, "loading-dats", 100);
+
+  const { loadPlatformDAT } = await import("./datLoader");
+
+  // Determine which platforms to check (uses disc detection for ISO files)
+  const platforms = await determinePlatforms(file, forcePlatform);
+
+  // Validation stage
+  onProgress?.(currentIndex + 1, totalFiles, file.name, "validating", 0);
+
+  let result: ValidationResult;
+
+  if (forcePlatform) {
+    try {
+      const platformEntries = await loadPlatformDAT(forcePlatform);
+      const datSource = getDATSource(forcePlatform);
+      result = validateROM(file, hashes, platformEntries, datSource);
+    } catch (error) {
+      console.error(`Error loading forced platform ${forcePlatform}:`, error);
+      result = {
+        filename: file.name,
+        originalName: file.name,
+        status: "unknown",
+        size: file.size,
+        hashes,
+        issues: [
+          `Failed to load DAT for forced platform: ${forcePlatform}`,
+          error instanceof Error ? error.message : String(error),
+        ],
+        file,
+      };
+    }
+  } else if (platforms.length > 0) {
+    if (platforms.length > 1) {
+      const mostLikelyPlatform = detectPlatformFromName(file.name, file.size);
+
+      const orderedPlatforms = platforms.includes(mostLikelyPlatform)
+        ? [
+            mostLikelyPlatform,
+            ...platforms.filter((p) => p !== mostLikelyPlatform),
+          ]
+        : platforms;
+
+      let resultVal: ValidationResult = {
+        status: "unknown",
+      } as ValidationResult;
+
+      for (const platform of orderedPlatforms) {
+        const platformEntries = await loadPlatformDAT(platform);
+        const datSource = getDATSource(platform);
+        const platformResult = validateROM(
+          file,
+          hashes,
+          platformEntries,
+          datSource,
+        );
+
+        if (platformResult.status !== "unknown") {
+          resultVal = platformResult;
+          break;
+        }
+      }
+
+      if (resultVal.status === "unknown") {
+        const ext = file.name
+          .toLowerCase()
+          .substring(file.name.lastIndexOf("."));
+
+        let fallbackPlatforms: string[] = [];
+
+        if (ext === ".iso") {
+          fallbackPlatforms = ["PlayStation 2", "PSP", "GameCube"];
+        } else if (ext === ".bin") {
+          fallbackPlatforms = ["PlayStation", "Dreamcast", "PlayStation 2"];
         }
 
-        // If still no match and this is a multi-platform format, try cross-platform fallback
-        if (result.status === "unknown") {
-          const ext = file.name
-            .toLowerCase()
-            .substring(file.name.lastIndexOf("."));
+        if (fallbackPlatforms.length > 0) {
+          const uncheckedPlatforms = fallbackPlatforms.filter(
+            (p) => !orderedPlatforms.includes(p),
+          );
 
-          let fallbackPlatforms: string[] = [];
-
-          if (ext === ".iso") {
-            // ISO can be PS2, PSP, or GameCube
-            fallbackPlatforms = ["PlayStation 2", "PSP", "GameCube"];
-          } else if (ext === ".bin") {
-            // BIN can be PlayStation, Dreamcast, or PlayStation 2
-            fallbackPlatforms = ["PlayStation", "Dreamcast", "PlayStation 2"];
-          }
-
-          if (fallbackPlatforms.length > 0) {
-            // Try platforms not already checked
-            const uncheckedPlatforms = fallbackPlatforms.filter(
-              (p) => !orderedPlatforms.includes(p),
+          for (const platform of uncheckedPlatforms) {
+            const fallbackEntries = await loadPlatformDAT(platform);
+            const datSource = getDATSource(platform);
+            const fallbackResult = validateROM(
+              file,
+              hashes,
+              fallbackEntries,
+              datSource,
             );
 
-            for (const platform of uncheckedPlatforms) {
-              const fallbackEntries = await loadPlatformDAT(platform);
-              const datSource = getDATSource(platform);
-              const fallbackResult = validateROM(
-                file,
-                hashes,
-                fallbackEntries,
-                datSource,
-              );
-
-              if (fallbackResult.status !== "unknown") {
-                result = fallbackResult;
-                break; // Found a match, stop checking
-              }
+            if (fallbackResult.status !== "unknown") {
+              resultVal = fallbackResult;
+              break;
             }
           }
         }
-
-        // Final fallback: if still unknown, return result with the most likely platform info
-        if (result.status === "unknown") {
-          const fallbackEntries = await loadPlatformDAT(orderedPlatforms[0]);
-          const datSource = getDATSource(orderedPlatforms[0]);
-          result = validateROM(file, hashes, fallbackEntries, datSource);
-        }
-      } else {
-        // Single platform, load and validate normally
-        const platformEntries = await loadPlatformDAT(platforms[0]);
-        const datSource = getDATSource(platforms[0]);
-        result = validateROM(file, hashes, platformEntries, datSource);
       }
+
+      if (resultVal.status === "unknown") {
+        const fallbackEntries = await loadPlatformDAT(orderedPlatforms[0]);
+        const datSource = getDATSource(orderedPlatforms[0]);
+        resultVal = validateROM(file, hashes, fallbackEntries, datSource);
+      }
+
+      result = resultVal;
     } else {
-      // Fallback to all DATs if platform detection fails
-      const platformEntries = await loadDATFiles();
-      result = validateROM(file, hashes, platformEntries, "Mixed");
+      const platformEntries = await loadPlatformDAT(platforms[0]);
+      const datSource = getDATSource(platforms[0]);
+      result = validateROM(file, hashes, platformEntries, datSource);
     }
-
-    results.push(result);
-
-    // File validation complete
-    onProgress?.(i + 1, validFiles.length, file.name, "validating", 100);
+  } else {
+    const platformEntries = await loadDATFiles();
+    result = validateROM(file, hashes, platformEntries, "Mixed");
   }
 
-  return results;
+  onProgress?.(currentIndex + 1, totalFiles, file.name, "validating", 100);
+  return result;
 }
