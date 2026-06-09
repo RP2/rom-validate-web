@@ -7,14 +7,13 @@ import {
   Clock,
   AlertCircle,
   Loader2,
-  File,
   Hash,
   Database,
   CheckCircle2,
   Timer,
   Files,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 
 interface FileProgress {
   id: string;
@@ -53,35 +52,69 @@ export default function ValidationProgress({
   onCancel,
 }: ValidationProgressProps) {
   const [mounted, setMounted] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Calculate overall progress with more granular steps
-  const overallProgress =
-    files.length > 0
-      ? (() => {
-          const filesCompleted = files.filter(
-            (f) => f.status === "completed",
-          ).length;
-          const currentFileProgress =
-            files.find(
-              (f) => f.status === "hashing" || f.status === "validating",
-            )?.progress || 0;
-          const baseProgress = (filesCompleted / files.length) * 100;
-          const currentProgress =
-            (currentFileProgress / 100) * (1 / files.length) * 100;
-          return Math.min(baseProgress + currentProgress, 100);
-        })()
-      : 0;
+  // Update elapsed time once per second — avoids re-renders on every progress tick
+  const startTimeRef = useRef(stats.timeStarted);
+  useEffect(() => {
+    startTimeRef.current = stats.timeStarted;
+    setElapsedSeconds(Math.floor((Date.now() - stats.timeStarted) / 1000));
 
-  // Calculate time remaining
-  const timeElapsed = Date.now() - stats.timeStarted;
+    if (stats.currentStage === "completed") return;
+
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startTimeRef.current) / 1000));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [stats.timeStarted, stats.currentStage]);
+
+  // Derive stable counts from the files array
+  const completedCount = useMemo(
+    () => files.filter((f) => f.status === "completed").length,
+    [files],
+  );
+  const errorCount = useMemo(
+    () => files.filter((f) => f.status === "error").length,
+    [files],
+  );
+  const processingCount = useMemo(
+    () =>
+      files.filter(
+        (f) => f.status === "hashing" || f.status === "validating" || f.status === "processing",
+      ).length,
+    [files],
+  );
+  const pendingCount = useMemo(
+    () => files.filter((f) => f.status === "pending").length,
+    [files],
+  );
+
+  // Calculate overall progress from all files, not just one
+  const overallProgress = useMemo(() => {
+    if (files.length === 0) return 0;
+
+    // Each file contributes: completed=100%, processing=its progress%, pending=0%
+    const totalProgress = files.reduce((sum, f) => {
+      if (f.status === "completed" || f.status === "error") return sum + 100;
+      if (f.status === "hashing" || f.status === "validating" || f.status === "processing")
+        return sum + f.progress;
+      return sum;
+    }, 0);
+
+    return Math.min(totalProgress / files.length, 100);
+  }, [files]);
+
+  // Calculate time remaining based on completed files
+  const timeElapsedMs = elapsedSeconds * 1000;
   const avgTimePerFile =
-    stats.processedFiles > 0 ? timeElapsed / stats.processedFiles : 0;
-  const remainingFiles = files.length - stats.processedFiles;
-  const estimatedTimeRemaining =
+    completedCount > 0 ? timeElapsedMs / completedCount : 0;
+  const remainingFiles = files.length - completedCount - errorCount;
+  const estimatedTimeRemainingMs =
     remainingFiles > 0 && avgTimePerFile > 0
       ? remainingFiles * avgTimePerFile
       : undefined;
@@ -200,48 +233,65 @@ export default function ValidationProgress({
         <div className="space-y-3">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium">
-              {stats.processedFiles} of {files.length} files processed
+              {completedCount} of {files.length} files processed
             </span>
             <span className="text-muted-foreground">
               {Math.round(overallProgress)}%
             </span>
           </div>
 
-          <motion.div
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-          >
-            <Progress value={overallProgress} className="h-2" />
-          </motion.div>
+          <Progress value={overallProgress} className="h-2" />
 
           {/* Time information */}
           <div className="text-muted-foreground flex items-center justify-between text-xs">
             <div className="flex items-center gap-1">
               <Timer className="h-3 w-3" />
-              <span>Elapsed: {formatTime(timeElapsed)}</span>
+              <span>Elapsed: {formatTime(timeElapsedMs)}</span>
             </div>
-            {estimatedTimeRemaining && stats.currentStage !== "completed" && (
-              <span>Est. remaining: {formatTime(estimatedTimeRemaining)}</span>
+            {estimatedTimeRemainingMs && stats.currentStage !== "completed" && (
+              <span>Est. remaining: {formatTime(estimatedTimeRemainingMs)}</span>
             )}
           </div>
         </div>
 
-        {/* Current file being processed */}
-        {stats.currentFile && stats.currentStage !== "completed" && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-muted/50 rounded-lg border p-3"
-          >
-            <div className="flex items-center gap-2 text-sm">
-              <Loader2 className="text-primary h-4 w-4 animate-spin" />
-              <span className="font-medium">Processing:</span>
-              <span className="text-muted-foreground truncate font-mono">
-                {stats.currentFile}
-              </span>
+        {/* Batch status summary — shows how many files are in each state */}
+        {stats.currentStage !== "completed" && (
+          <div className="bg-muted/50 rounded-lg border p-3">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              {processingCount > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <Loader2 className="text-primary h-3.5 w-3.5 animate-spin" />
+                  <span>
+                    {processingCount} processing
+                  </span>
+                </div>
+              )}
+              {completedCount > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                  <span>
+                    {completedCount} done
+                  </span>
+                </div>
+              )}
+              {pendingCount > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <Clock className="text-muted-foreground h-3.5 w-3.5" />
+                  <span>
+                    {pendingCount} queued
+                  </span>
+                </div>
+              )}
+              {errorCount > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+                  <span>
+                    {errorCount} error{errorCount !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              )}
             </div>
-          </motion.div>
+          </div>
         )}
 
         {/* File list with individual progress */}

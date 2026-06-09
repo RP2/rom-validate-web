@@ -10,7 +10,10 @@
     "format": "prettier --write .",
     "test:config": "tsx tests/test-config.mts",
     "test:dat-urls": "tsx tests/test-dat-urls.mts",
-    "test": "npm run test:config && npm run test:dat-urls"
+    "test:validation": "tsx tests/test-validation-logic.mts",
+    "test:worker-pool": "tsx tests/test-worker-pool.mts",
+    "test:dat-loader": "tsx tests/test-dat-loader.mts",
+    "test": "npm run test:config && npm run test:validation && npm run test:worker-pool && npm run test:dat-loader"
   },
   "dependencies": {
     "@astrojs/react": "^5.0.3",
@@ -27,6 +30,7 @@
     "astro": "^6.1.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "fflate": "^0.8.3",
     "lucide-react": "^0.536.0",
     "motion": "^12.23.12",
     "radix-ui": "^1.4.3",
@@ -42,5 +46,8 @@
     "prettier-plugin-tailwindcss": "^0.6.14",
     "tsx": "^4.20.3",
     "tw-animate-css": "^1.3.6"
+  },
+  "overrides": {
+    "vite": "^7"
   }
 }

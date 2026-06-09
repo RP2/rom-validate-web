@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -70,6 +70,7 @@ export default function FileUpload() {
   const [validationStats, setValidationStats] =
     useState<ValidationStats | null>(null);
   const [showProgress, setShowProgress] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Load supported platforms on component mount
   useEffect(() => {
@@ -83,7 +84,7 @@ export default function FileUpload() {
       setShowProgress(false);
       setValidationStats(null);
       setIsValidating(false);
-      // Reset file statuses to pending but keep the files
+      // Reset all file statuses to pending (full reset)
       setFiles((prev) =>
         prev.map((f) => ({
           ...f,
@@ -268,14 +269,35 @@ export default function FileUpload() {
   }, []);
 
   const addFiles = (newFiles: File[]) => {
-    const fileObjects: UploadedFile[] = newFiles.map((file) => ({
-      file,
-      id: crypto.randomUUID(),
-      status: "pending",
-      progress: 0,
-    }));
+    // Skip duplicates: same name + same size = likely the same file
+    setFiles((prev) => {
+      const existing = new Set(prev.map((f) => `${f.file.name}|${f.file.size}`));
+      const unique = newFiles.filter(
+        (f) => !existing.has(`${f.name}|${f.size}`),
+      );
 
-    setFiles((prev) => [...prev, ...fileObjects]);
+      if (unique.length === 0) {
+        toast.info("All files already added", {
+          description: "Duplicate files are automatically skipped.",
+        });
+        return prev;
+      }
+
+      if (unique.length < newFiles.length) {
+        toast.info(`${newFiles.length - unique.length} duplicate file(s) skipped`, {
+          description: "Files with the same name and size are already in the queue.",
+        });
+      }
+
+      const fileObjects: UploadedFile[] = unique.map((file) => ({
+        file,
+        id: crypto.randomUUID(),
+        status: "pending",
+        progress: 0,
+      }));
+
+      return [...prev, ...fileObjects];
+    });
 
     // Scroll to file list after a short delay to ensure DOM is updated
     setTimeout(() => {
@@ -331,17 +353,25 @@ export default function FileUpload() {
   };
 
   const cancelValidation = () => {
+    // Abort any in-progress validation
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     setIsValidating(false);
     setShowProgress(false);
     setValidationStats(null);
-    // Reset file statuses but keep the files
+    // Reset only files that weren't completed yet
     setFiles((prev) =>
-      prev.map((f) => ({
-        ...f,
-        status: "pending" as const,
-        progress: 0,
-        timeStarted: undefined,
-      })),
+      prev.map((f) => {
+        if (f.status === "completed") return f;
+        return {
+          ...f,
+          status: "pending" as const,
+          progress: 0,
+          timeStarted: undefined,
+        };
+      }),
     );
   };
 
@@ -353,81 +383,83 @@ export default function FileUpload() {
   };
 
   const startValidation = async () => {
-    if (files.length === 0) return;
+    // Only validate files that haven't been validated yet
+    const pendingFiles = files.filter((f) => f.status === "pending");
+    if (pendingFiles.length === 0) return;
 
     setIsValidating(true);
     setShowProgress(true);
 
-    // Initialize validation stats
+    // Initialize validation stats for only the pending files
     const startTime = Date.now();
     setValidationStats({
-      totalFiles: files.length,
+      totalFiles: pendingFiles.length,
       processedFiles: 0,
       currentStage: "initializing",
       timeStarted: startTime,
     });
 
     try {
-      // Process files locally using the ROM validator
-      const fileList = files.map((f) => f.file);
+      // Process only pending files
+      const fileList = pendingFiles.map((f) => f.file);
+
+      // Map from file reference to its index in the pendingFiles array
+      const fileIndexMap = new Map<File, number>();
+      pendingFiles.forEach((f, i) => fileIndexMap.set(f.file, i));
 
       // Set stage to hashing
       setValidationStats((prev) =>
         prev ? { ...prev, currentStage: "hashing" } : null,
       );
 
+      // Create abort controller for cancellation
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+
       const results = await validateROMs(
         fileList,
         (current, total, currentFileName, stage, fileProgress = 0) => {
-          // Update progress for the current file being processed
-          const currentIndex = files.findIndex(
-            (f) => f.file.name === currentFileName,
-          );
+          // Only update the specific file being reported.
+          // In parallel mode, files complete out of order, so we must NOT
+          // infer completion of other files from index ordering.
+          if (current >= 1) {
+            const pendingIndex = current - 1;
 
-          // Update validation stats
-          setValidationStats((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  processedFiles: current - 1,
-                  currentFile: currentFileName,
-                  currentStage: stage,
-                }
-              : null,
-          );
+            setFiles((prev) =>
+              prev.map((f) => {
+                const pIdx = fileIndexMap.get(f.file);
+                if (pIdx !== pendingIndex) return f; // Not this file — skip
 
-          setFiles((prev) =>
-            prev.map((f, index) => {
-              if (index === currentIndex) {
-                const status =
-                  stage === "hashing"
-                    ? "processing"
-                    : stage === "loading-dats"
-                      ? "processing"
-                      : stage === "validating"
-                        ? "processing"
-                        : "processing";
+                // Mark as completed if progress is 100, otherwise processing
+                const newStatus = fileProgress >= 100
+                  ? ("completed" as const)
+                  : ("processing" as const);
 
                 return {
                   ...f,
-                  status,
+                  status: newStatus,
                   progress: fileProgress,
                   timeStarted: f.timeStarted || Date.now(),
                 };
-              } else if (index < currentIndex) {
-                return { ...f, status: "completed", progress: 100 };
-              }
-              return f;
-            }),
-          );
+              }),
+            );
+          }
         },
         selectedPlatform !== "auto" ? selectedPlatform : undefined,
         getParallelWorkerCount(),
+        abortController.signal,
       );
 
-      // Mark all files as completed
+      // Mark all pending files as completed
+      abortControllerRef.current = null;
+
       setFiles((prev) =>
-        prev.map((f) => ({ ...f, status: "completed", progress: 100 })),
+        prev.map((f) => {
+          if (f.status === "pending" || f.status === "processing") {
+            return { ...f, status: "completed" as const, progress: 100 };
+          }
+          return f;
+        }),
       );
 
       // Update final stats
@@ -435,15 +467,21 @@ export default function FileUpload() {
         prev
           ? {
               ...prev,
-              processedFiles: files.length,
+              processedFiles: pendingFiles.length,
               currentStage: "completed",
               currentFile: undefined,
             }
           : null,
       );
 
-      // Store results globally for the results component to access
-      window.validationResults = results;
+      // Accumulate results: append to any existing results so adding more files works
+      window.validationResults = [
+        ...(window.validationResults || []),
+        ...results,
+      ];
+
+      // Dispatch event so ValidationResults picks up the new data
+      window.dispatchEvent(new CustomEvent("validationResultsUpdated"));
 
       // Show results section but keep progress visible
       setTimeout(() => {
@@ -455,6 +493,13 @@ export default function FileUpload() {
         }
       }, 500);
     } catch (error) {
+      abortControllerRef.current = null;
+
+      // If cancelled, don't show an error — just reset
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+
       console.error("Validation error:", error);
       setIsValidating(false);
       setShowProgress(false);
@@ -480,15 +525,20 @@ export default function FileUpload() {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
-      // Mark files with errors
+      // Mark only pending/processing files with errors (don't touch already-completed ones)
       setFiles((prev) =>
-        prev.map((f) => ({
-          ...f,
-          status: "error",
-          error: isOutOfMemory
-            ? "Out of memory - please retry with fewer files"
-            : `Validation failed: ${errorMessage}`,
-        })),
+        prev.map((f) => {
+          if (f.status === "pending" || f.status === "processing") {
+            return {
+              ...f,
+              status: "error" as const,
+              error: isOutOfMemory
+                ? "Out of memory - please retry with fewer files"
+                : `Validation failed: ${errorMessage}`,
+            };
+          }
+          return f;
+        }),
       );
     }
   };
@@ -546,10 +596,10 @@ export default function FileUpload() {
               isDragOver ? "text-primary" : "text-foreground"
             }`}
           >
-            {isDragOver ? "Drop files here!" : "Drop ROM files here"}
+            {isDragOver ? "Drop files here!" : files.length > 0 ? `${files.length} file${files.length !== 1 ? "s" : ""} ready to validate` : "Drop ROM files here"}
           </h3>
           <p className="text-muted-foreground mb-4">
-            or click to browse your files
+            {files.length > 0 ? "Add more files or click Validate below" : "or click to browse your files"}
           </p>
           <Button
             variant="outline"
@@ -689,7 +739,7 @@ export default function FileUpload() {
             <div className="mt-6 flex gap-3">
               <Button
                 onClick={startValidation}
-                disabled={isValidating}
+                disabled={isValidating || files.filter((f) => f.status === "pending").length === 0}
                 className="flex-1"
               >
                 {isValidating ? (
@@ -697,6 +747,8 @@ export default function FileUpload() {
                     <div className="border-primary-foreground mr-2 h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
                     Validating...
                   </>
+                ) : files.some((f) => f.status === "completed") ? (
+                  "Validate New Files"
                 ) : (
                   "Start Validation"
                 )}
@@ -721,13 +773,9 @@ export default function FileUpload() {
             name: f.file.name,
             status:
               f.status === "processing"
-                ? validationStats?.currentStage === "hashing"
+                ? f.progress < 90
                   ? "hashing"
-                  : validationStats?.currentStage === "loading-dats"
-                    ? "validating"
-                    : validationStats?.currentStage === "validating"
-                      ? "validating"
-                      : "validating"
+                  : "validating"
                 : f.status === "completed"
                   ? "completed"
                   : f.status === "error"

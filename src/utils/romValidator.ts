@@ -815,6 +815,7 @@ export async function validateROMs(
   ) => void,
   forcePlatform?: string,
   parallelWorkers?: number,
+  abortSignal?: AbortSignal,
 ): Promise<ValidationResult[]> {
   const results: ValidationResult[] = [];
 
@@ -823,6 +824,10 @@ export async function validateROMs(
     const ext = file.name.toLowerCase().substring(file.name.lastIndexOf("."));
     return ext !== ".cue";
   });
+
+  if (validFiles.length === 0) {
+    return results;
+  }
 
   // Initialize worker pool if parallel processing is enabled
   const useParallel = parallelWorkers && parallelWorkers > 1;
@@ -833,7 +838,57 @@ export async function validateROMs(
   }
 
   try {
-    // Process files - either parallel or sequential
+    // Check for cancellation before starting
+    if (abortSignal?.aborted) {
+      return results;
+    }
+
+    // Phase 1: Pre-load only the DATs we actually need
+    // Determine platforms from file extensions/sizes first (fast, no network),
+    // then load those DATs in parallel. Disc header detection for ISOs happens
+    // per-file during validation since it requires reading the file.
+    onProgress?.(0, validFiles.length, "", "loading-dats", 0);
+
+    const { loadPlatformDAT } = await import("./datLoader");
+
+    // Determine which platforms we need based on file extensions and sizes
+    let platformsNeeded: string[];
+    if (forcePlatform) {
+      platformsNeeded = [forcePlatform];
+    } else {
+      const platformSet = new Set<string>();
+      for (const file of validFiles) {
+        if (abortSignal?.aborted) return results;
+        const platforms = await determinePlatforms(file);
+        for (const p of platforms) {
+          platformSet.add(p);
+        }
+      }
+      platformsNeeded = [...platformSet];
+    }
+
+    // Load only the needed DATs in parallel (each is cached after first load)
+    const datCache = new Map<string, DATEntry[]>();
+    const datSourceCache = new Map<string, string | undefined>();
+
+    await Promise.all(
+      platformsNeeded.map(async (platform) => {
+        try {
+          const entries = await loadPlatformDAT(platform);
+          const source = getDATSource(platform);
+          datCache.set(platform, entries);
+          datSourceCache.set(platform, source);
+        } catch (error) {
+          console.error(`Failed to load DAT for ${platform}:`, error);
+          datCache.set(platform, []);
+          datSourceCache.set(platform, undefined);
+        }
+      }),
+    );
+
+    onProgress?.(0, validFiles.length, "", "loading-dats", 100);
+
+    // Phase 2: Hash and validate files
     if (useParallel) {
       await processFilesParallel(
         validFiles,
@@ -841,6 +896,9 @@ export async function validateROMs(
         onProgress,
         forcePlatform,
         parallelWorkers,
+        datCache,
+        datSourceCache,
+        abortSignal,
       );
     } else {
       await processFilesSequential(
@@ -848,6 +906,9 @@ export async function validateROMs(
         results,
         onProgress,
         forcePlatform,
+        datCache,
+        datSourceCache,
+        abortSignal,
       );
     }
   } finally {
@@ -871,35 +932,66 @@ async function processFilesSequential(
     fileProgress?: number,
   ) => void,
   forcePlatform?: string,
+  datCache?: Map<string, DATEntry[]>,
+  datSourceCache?: Map<string, string | undefined>,
+  abortSignal?: AbortSignal,
 ): Promise<void> {
   for (let i = 0; i < validFiles.length; i++) {
+    if (abortSignal?.aborted) break;
+
     const file = validFiles[i];
 
     // Start hashing stage
     onProgress?.(i + 1, validFiles.length, file.name, "hashing", 0);
 
-    const hashes = await calculateFileHashes(file, (hashProgress) => {
-      onProgress?.(
-        i + 1,
-        validFiles.length,
-        file.name,
-        "hashing",
-        hashProgress,
-      );
-    });
+    try {
+      const hashes = await calculateFileHashes(file, (hashProgress) => {
+        onProgress?.(
+          i + 1,
+          validFiles.length,
+          file.name,
+          "hashing",
+          hashProgress,
+        );
+      });
 
-    const result = await processSingleFileValidation(
-      file,
-      hashes,
-      onProgress,
-      i,
-      validFiles.length,
-      forcePlatform,
-    );
-    results.push(result);
+      const result = await processSingleFileValidation(
+        file,
+        hashes,
+        onProgress,
+        i,
+        validFiles.length,
+        forcePlatform,
+        datCache,
+        datSourceCache,
+      );
+      results.push(result);
+    } catch (error) {
+      // Per-file error: record a failure result and continue with remaining files
+      console.error(`Error processing ${file.name}:`, error);
+      const isOutOfMemory =
+        error instanceof Error &&
+        (error.name === "OutOfMemoryError" ||
+          error.message.includes("allocation") ||
+          error.message.includes("memory") ||
+          error.message.includes("out of memory"));
+
+      results.push({
+        filename: file.name,
+        originalName: file.name,
+        status: "unknown",
+        size: file.size,
+        hashes: { md5: "", sha1: "", crc32: "" },
+        issues: [
+          isOutOfMemory
+            ? "Out of memory — file too large to process. Try processing large files individually."
+            : `Processing error: ${error instanceof Error ? error.message : String(error)}`,
+        ],
+        file,
+      });
+    }
   }
 }
-
 async function processFilesParallel(
   validFiles: File[],
   results: ValidationResult[],
@@ -912,31 +1004,114 @@ async function processFilesParallel(
   ) => void,
   forcePlatform?: string,
   workerCount: number = 4,
+  datCache?: Map<string, DATEntry[]>,
+  datSourceCache?: Map<string, string | undefined>,
+  abortSignal?: AbortSignal,
 ): Promise<void> {
-  const batchSize = Math.min(validFiles.length, workerCount);
-  let processedCount = 0;
+  // Separate large files (>1GB) from small files.
+  // Large files are processed one at a time to avoid memory pressure.
+  const LARGE_FILE_THRESHOLD = 1024 * 1024 * 1024; // 1GB
+  const largeFiles = validFiles.filter((f) => f.size > LARGE_FILE_THRESHOLD);
+  const smallFiles = validFiles.filter((f) => f.size <= LARGE_FILE_THRESHOLD);
 
-  while (processedCount < validFiles.length) {
-    const batch = validFiles.slice(processedCount, processedCount + batchSize);
+  // Process small files in parallel batches
+  if (smallFiles.length > 0) {
+    const batchSize = Math.min(smallFiles.length, workerCount);
+    let processedCount = 0;
 
-    const batchPromises = batch.map(async (file, batchIndex) => {
-      const globalIndex = processedCount + batchIndex;
+    while (processedCount < smallFiles.length) {
+      if (abortSignal?.aborted) break;
+
+      const batch = smallFiles.slice(processedCount, processedCount + batchSize);
+
+      const batchPromises = batch.map(async (file, batchIndex) => {
+        const globalIndex = validFiles.indexOf(file);
 
       onProgress?.(globalIndex + 1, validFiles.length, file.name, "hashing", 0);
 
-      const hashes = await calculateFileHashes(
-        file,
-        (hashProgress) => {
-          onProgress?.(
-            globalIndex + 1,
-            validFiles.length,
-            file.name,
-            "hashing",
-            hashProgress,
-          );
-        },
-        workerCount,
-      );
+      try {
+        const hashes = await calculateFileHashes(
+          file,
+          (hashProgress) => {
+            onProgress?.(
+              globalIndex + 1,
+              validFiles.length,
+              file.name,
+              "hashing",
+              hashProgress,
+            );
+          },
+          workerCount,
+        );
+
+        onProgress?.(
+          globalIndex + 1,
+          validFiles.length,
+          file.name,
+          "loading-dats",
+          100,
+        );
+
+        const result = await processSingleFileValidation(
+          file,
+          hashes,
+          onProgress,
+          globalIndex,
+          validFiles.length,
+          forcePlatform,
+          datCache,
+          datSourceCache,
+        );
+        return result;
+      } catch (error) {
+        // Per-file error: record a failure result and continue
+        console.error(`Error processing ${file.name}:`, error);
+        const isOutOfMemory =
+          error instanceof Error &&
+          (error.name === "OutOfMemoryError" ||
+            error.message.includes("allocation") ||
+            error.message.includes("memory") ||
+            error.message.includes("out of memory"));
+
+        return {
+          filename: file.name,
+          originalName: file.name,
+          status: "unknown" as const,
+          size: file.size,
+          hashes: { md5: "", sha1: "", crc32: "" },
+          issues: [
+            isOutOfMemory
+              ? "Out of memory — file too large to process. Try processing large files individually."
+              : `Processing error: ${error instanceof Error ? error.message : String(error)}`,
+          ],
+          file,
+        };
+      }
+    });
+
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+      processedCount += batch.length;
+    }
+  }
+
+  // Process large files sequentially to avoid memory pressure
+  for (const file of largeFiles) {
+    if (abortSignal?.aborted) break;
+
+    const globalIndex = validFiles.indexOf(file);
+    onProgress?.(globalIndex + 1, validFiles.length, file.name, "hashing", 0);
+
+    try {
+      const hashes = await calculateFileHashes(file, (hashProgress) => {
+        onProgress?.(
+          globalIndex + 1,
+          validFiles.length,
+          file.name,
+          "hashing",
+          hashProgress,
+        );
+      });
 
       onProgress?.(
         globalIndex + 1,
@@ -953,13 +1128,33 @@ async function processFilesParallel(
         globalIndex,
         validFiles.length,
         forcePlatform,
+        datCache,
+        datSourceCache,
       );
-      return result;
-    });
+      results.push(result);
+    } catch (error) {
+      console.error(`Error processing ${file.name}:`, error);
+      const isOutOfMemory =
+        error instanceof Error &&
+        (error.name === "OutOfMemoryError" ||
+          error.message.includes("allocation") ||
+          error.message.includes("memory") ||
+          error.message.includes("out of memory"));
 
-    const batchResults = await Promise.all(batchPromises);
-    results.push(...batchResults);
-    processedCount += batch.length;
+      results.push({
+        filename: file.name,
+        originalName: file.name,
+        status: "unknown",
+        size: file.size,
+        hashes: { md5: "", sha1: "", crc32: "" },
+        issues: [
+          isOutOfMemory
+            ? "Out of memory — file too large to process. Try processing large files individually."
+            : `Processing error: ${error instanceof Error ? error.message : String(error)}`,
+        ],
+        file,
+      });
+    }
   }
 }
 
@@ -976,11 +1171,11 @@ async function processSingleFileValidation(
   currentIndex: number = 0,
   totalFiles: number = 1,
   forcePlatform?: string,
+  datCache?: Map<string, DATEntry[]>,
+  datSourceCache?: Map<string, string | undefined>,
 ): Promise<ValidationResult> {
-  // Loading DATs stage
+  // Loading DATs stage (DATs are pre-loaded, this is now instant)
   onProgress?.(currentIndex + 1, totalFiles, file.name, "loading-dats", 100);
-
-  const { loadPlatformDAT } = await import("./datLoader");
 
   // Determine which platforms to check (uses disc detection for ISO files)
   const platforms = await determinePlatforms(file, forcePlatform);
@@ -988,28 +1183,27 @@ async function processSingleFileValidation(
   // Validation stage
   onProgress?.(currentIndex + 1, totalFiles, file.name, "validating", 0);
 
+  // Helper: get DAT entries for a platform, loading on demand if not cached
+  const { loadPlatformDAT } = await import("./datLoader");
+  const getEntries = async (platform: string): Promise<DATEntry[]> => {
+    if (datCache?.has(platform)) return datCache.get(platform)!;
+    // Not pre-loaded — fetch on demand and cache for future files
+    const entries = await loadPlatformDAT(platform);
+    datCache?.set(platform, entries);
+    const source = getDATSource(platform);
+    datSourceCache?.set(platform, source);
+    return entries;
+  };
+  const getSource = (platform: string): string | undefined => {
+    return datSourceCache?.get(platform) ?? getDATSource(platform);
+  };
+
   let result: ValidationResult;
 
   if (forcePlatform) {
-    try {
-      const platformEntries = await loadPlatformDAT(forcePlatform);
-      const datSource = getDATSource(forcePlatform);
-      result = validateROM(file, hashes, platformEntries, datSource);
-    } catch (error) {
-      console.error(`Error loading forced platform ${forcePlatform}:`, error);
-      result = {
-        filename: file.name,
-        originalName: file.name,
-        status: "unknown",
-        size: file.size,
-        hashes,
-        issues: [
-          `Failed to load DAT for forced platform: ${forcePlatform}`,
-          error instanceof Error ? error.message : String(error),
-        ],
-        file,
-      };
-    }
+    const platformEntries = await getEntries(forcePlatform);
+    const datSource = getSource(forcePlatform);
+    result = validateROM(file, hashes, platformEntries, datSource);
   } else if (platforms.length > 0) {
     if (platforms.length > 1) {
       const mostLikelyPlatform = detectPlatformFromName(file.name, file.size);
@@ -1026,8 +1220,8 @@ async function processSingleFileValidation(
       } as ValidationResult;
 
       for (const platform of orderedPlatforms) {
-        const platformEntries = await loadPlatformDAT(platform);
-        const datSource = getDATSource(platform);
+        const platformEntries = await getEntries(platform);
+        const datSource = getSource(platform);
         const platformResult = validateROM(
           file,
           hashes,
@@ -1060,8 +1254,8 @@ async function processSingleFileValidation(
           );
 
           for (const platform of uncheckedPlatforms) {
-            const fallbackEntries = await loadPlatformDAT(platform);
-            const datSource = getDATSource(platform);
+            const fallbackEntries = await getEntries(platform);
+            const datSource = getSource(platform);
             const fallbackResult = validateROM(
               file,
               hashes,
@@ -1078,20 +1272,34 @@ async function processSingleFileValidation(
       }
 
       if (resultVal.status === "unknown") {
-        const fallbackEntries = await loadPlatformDAT(orderedPlatforms[0]);
-        const datSource = getDATSource(orderedPlatforms[0]);
+        const fallbackEntries = await getEntries(orderedPlatforms[0]);
+        const datSource = getSource(orderedPlatforms[0]);
         resultVal = validateROM(file, hashes, fallbackEntries, datSource);
       }
 
       result = resultVal;
     } else {
-      const platformEntries = await loadPlatformDAT(platforms[0]);
-      const datSource = getDATSource(platforms[0]);
+      const platformEntries = await getEntries(platforms[0]);
+      const datSource = getSource(platforms[0]);
       result = validateROM(file, hashes, platformEntries, datSource);
     }
   } else {
-    const platformEntries = await loadDATFiles();
-    result = validateROM(file, hashes, platformEntries, "Mixed");
+    // No platform detected — try all cached DATs first, then fall back to loading all
+    const allEntries: DATEntry[] = [];
+    const allSources: string[] = [];
+    if (datCache && datCache.size > 0) {
+      for (const [platform, entries] of datCache) {
+        allEntries.push(...entries);
+        const source = datSourceCache?.get(platform);
+        if (source) allSources.push(source);
+      }
+    } else {
+      // Last resort: load all DATs
+      const allDatEntries = await loadDATFiles();
+      allEntries.push(...allDatEntries);
+    }
+    const datSource = allSources.length > 0 ? allSources.join(", ") : undefined;
+    result = validateROM(file, hashes, allEntries, datSource);
   }
 
   onProgress?.(currentIndex + 1, totalFiles, file.name, "validating", 100);

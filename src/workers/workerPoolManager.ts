@@ -25,6 +25,7 @@ class WorkerPool {
   private pendingOperations = new Map<string, PendingOperation>();
   private availableWorkers: Worker[] = [];
   private queue: Array<{ file: File; fileId: string }> = [];
+  private activeTasks = new Map<string, Worker>(); // Track which worker is processing which fileId
   private messageId = 0;
   private workerCount: number;
   private onProgress?: (fileId: string, progress: number) => void;
@@ -54,6 +55,14 @@ class WorkerPool {
     }
   }
 
+  private releaseWorker(fileId: string): void {
+    const worker = this.activeTasks.get(fileId);
+    if (worker) {
+      this.activeTasks.delete(fileId);
+      this.availableWorkers.push(worker);
+    }
+  }
+
   private handleMessage(event: MessageEvent): void {
     const data = event.data;
     const operation = this.pendingOperations.get(data.fileId);
@@ -71,6 +80,7 @@ class WorkerPool {
         this.pendingOperations.delete(data.fileId);
         operation.resolve(data.hashes);
         this.onComplete?.(data.fileId, data.hashes);
+        this.releaseWorker(data.fileId);
         this.processQueue();
         break;
       case "ERROR":
@@ -81,6 +91,7 @@ class WorkerPool {
         }
         operation.reject(error);
         this.onError?.(data.fileId, error);
+        this.releaseWorker(data.fileId);
         this.processQueue();
         break;
     }
@@ -99,6 +110,7 @@ class WorkerPool {
   }
 
   private runTask(worker: Worker, file: File, fileId: string): void {
+    this.activeTasks.set(fileId, worker);
     worker.postMessage({
       type: "HASH_FILE",
       file,
@@ -131,6 +143,7 @@ class WorkerPool {
     this.workers = [];
     this.availableWorkers = [];
     this.pendingOperations.clear();
+    this.activeTasks.clear();
     this.queue = [];
   }
   getWorkerCount(): number {

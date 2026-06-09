@@ -28,7 +28,15 @@ export function getStoredSettings(): Partial<ValidationSettings> {
 
 export function getParallelWorkerCount(): number {
   const settings = getStoredSettings();
-  const value = settings.parallelWorkers || "4";
+  const value = settings.parallelWorkers || "auto";
+
+  if (value === "auto") {
+    // Use hardware concurrency but cap at 6 for safety
+    const cores = typeof navigator !== "undefined" && navigator.hardwareConcurrency
+      ? navigator.hardwareConcurrency
+      : 4;
+    return Math.min(Math.max(cores - 1, 2), 6); // Leave 1 core for UI, min 2, max 6
+  }
 
   const parsed = parseInt(value, 10);
   const count = isNaN(parsed) ? 4 : parsed;

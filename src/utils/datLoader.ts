@@ -128,6 +128,7 @@ function loadFromPersistentCache(
 }
 
 // Save to persistent cache
+// Silently skips if localStorage quota would be exceeded
 function saveToPersistentCache(
   platform: string,
   source: "bundled" | "libretro" | "custom",
@@ -140,8 +141,26 @@ function saveToPersistentCache(
       timestamp: Date.now(),
       version: CACHE_VERSION,
     };
-    localStorage.setItem(cacheKey, JSON.stringify(data));
+    const serialized = JSON.stringify(data);
+
+    // Check approximate size before attempting to save
+    // localStorage typically has a 5-10MB limit; skip if entry is too large
+    const sizeKB = serialized.length / 1024;
+    if (sizeKB > 2048) {
+      // Skip caching entries larger than ~2MB to avoid quota issues
+      // The in-memory cache (datCache) still works for this session
+      return;
+    }
+
+    // Try to save, catch quota exceeded errors
+    localStorage.setItem(cacheKey, serialized);
   } catch (error) {
+    // Silently ignore quota exceeded or other storage errors
+    // The in-memory cache (datCache) still works for this session
+    if (error instanceof DOMException) {
+      // QuotaExceededError - expected for large DAT sets, not a problem
+      return;
+    }
     console.warn("Failed to save to persistent cache:", error);
   }
 }
@@ -210,6 +229,30 @@ export async function loadBundledDAT(platform: string): Promise<DATEntry[]> {
   }
 }
 
+// Load DAT file from Libretro database with retry
+async function fetchWithRetry(url: string, retries: number = 1, delayMs: number = 1000): Promise<Response> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return response;
+      // Only retry on server errors (5xx) or network issues, not 404s
+      if (response.status >= 500 && attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
+        continue;
+      }
+      return response; // Return the error response for the caller to handle
+    } catch (error) {
+      // Network error — retry if we have attempts left
+      if (attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error("Unreachable");
+}
+
 // Load DAT file from Libretro database
 export async function loadLibretroDAT(platform: string): Promise<DATEntry[]> {
   const memoryKey = `libretro-${platform}`;
@@ -242,7 +285,7 @@ export async function loadLibretroDAT(platform: string): Promise<DATEntry[]> {
   const datUrl = `${LIBRETRO_BASE_URL}/${encodedPath}`;
 
   try {
-    const response = await fetch(datUrl);
+    const response = await fetchWithRetry(datUrl);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
