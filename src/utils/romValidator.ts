@@ -6,6 +6,11 @@ import {
   terminatePool,
   type PooledHashResult,
 } from "../workers/workerPoolManager";
+import {
+  getPlatformsForFile,
+  loadAllBundledDATs,
+  loadPlatformDAT,
+} from "./datLoader";
 
 // Web Worker singleton for hash calculation
 let hashWorker: Worker | null = null;
@@ -113,20 +118,21 @@ export interface ValidationResult {
   datSource?: string; // Which DAT database matched (e.g., "No-Intro", "Redump")
 }
 
+// CRC32 table (built once at module level)
+const CRC32_TABLE = new Uint32Array(256);
+for (let i = 0; i < 256; i++) {
+  let c = i;
+  for (let j = 0; j < 8; j++) {
+    c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  }
+  CRC32_TABLE[i] = c;
+}
+
 // CRC32 implementation for client-side hash calculation
 function crc32(data: Uint8Array): string {
-  const table = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let c = i;
-    for (let j = 0; j < 8; j++) {
-      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    }
-    table[i] = c;
-  }
-
   let crc = 0xffffffff;
   for (let i = 0; i < data.length; i++) {
-    crc = table[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
+    crc = CRC32_TABLE[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
   }
 
   return ((crc ^ 0xffffffff) >>> 0).toString(16).toUpperCase().padStart(8, "0");
@@ -196,8 +202,12 @@ async function calculateFileHashesLegacy(
   try {
     // Try to calculate SHA-1 (widely supported)
     const sha1Hash = await crypto.subtle.digest("SHA-1", buffer);
-    const sha1Array = Array.from(new Uint8Array(sha1Hash));
-    sha1 = sha1Array.map((b) => b.toString(16).padStart(2, "0")).join("");
+    const sha1View = new Uint8Array(sha1Hash);
+    let sha1Hex = "";
+    for (let i = 0; i < sha1View.length; i++) {
+      sha1Hex += sha1View[i].toString(16).padStart(2, "0");
+    }
+    sha1 = sha1Hex;
     onProgress?.(40); // SHA-1 complete
   } catch (error) {
     console.warn("SHA-1 calculation failed:", error);
@@ -208,8 +218,12 @@ async function calculateFileHashesLegacy(
   try {
     // Try to calculate MD5 (may not be available in all browsers)
     const md5Hash = await crypto.subtle.digest("MD5", buffer);
-    const md5Array = Array.from(new Uint8Array(md5Hash));
-    md5 = md5Array.map((b) => b.toString(16).padStart(2, "0")).join("");
+    const md5View = new Uint8Array(md5Hash);
+    let md5Hex = "";
+    for (let i = 0; i < md5View.length; i++) {
+      md5Hex += md5View[i].toString(16).padStart(2, "0");
+    }
+    md5 = md5Hex;
     onProgress?.(70); // MD5 complete
   } catch (error) {
     console.warn("MD5 not supported in this browser, using fallback:", error);
@@ -337,18 +351,62 @@ function parseClrMameProDAT(
       inRom = true;
       currentRom = {};
 
-      // Parse rom attributes from the same line
-      const nameMatch = trimmed.match(/name\s+"([^"]+)"/);
-      const sizeMatch = trimmed.match(/size\s+(\d+)/);
-      const crcMatch = trimmed.match(/crc\s+([a-fA-F0-9]+)/);
-      const md5Match = trimmed.match(/md5\s+([a-fA-F0-9]+)/);
-      const sha1Match = trimmed.match(/sha1\s+([a-fA-F0-9]+)/);
-
-      if (nameMatch) currentRom.name = nameMatch[1];
-      if (sizeMatch) currentRom.size = parseInt(sizeMatch[1]);
-      if (crcMatch) currentRom.crc32 = crcMatch[1].toUpperCase();
-      if (md5Match) currentRom.md5 = md5Match[1].toLowerCase();
-      if (sha1Match) currentRom.sha1 = sha1Match[1].toLowerCase();
+      const inner = trimmed.substring(5, trimmed.lastIndexOf(")")).trim();
+      let pos = 0;
+      while (pos < inner.length) {
+        while (pos < inner.length && inner[pos] === " ") pos++;
+        if (pos >= inner.length) break;
+        const kwStart = pos;
+        while (pos < inner.length && inner[pos] !== " ") pos++;
+        const keyword = inner.substring(kwStart, pos);
+        while (pos < inner.length && inner[pos] === " ") pos++;
+        switch (keyword) {
+          case "name": {
+            if (inner[pos] === '"') {
+              pos++;
+              const valStart = pos;
+              while (pos < inner.length && inner[pos] !== '"') pos++;
+              currentRom.name = inner.substring(valStart, pos);
+              pos++;
+            }
+            break;
+          }
+          case "size": {
+            const valStart = pos;
+            while (pos < inner.length && inner[pos] !== " ") pos++;
+            currentRom.size = parseInt(inner.substring(valStart, pos));
+            break;
+          }
+          case "crc": {
+            const valStart = pos;
+            while (pos < inner.length && inner[pos] !== " ") pos++;
+            currentRom.crc32 = inner.substring(valStart, pos).toUpperCase();
+            break;
+          }
+          case "md5": {
+            const valStart = pos;
+            while (pos < inner.length && inner[pos] !== " ") pos++;
+            currentRom.md5 = inner.substring(valStart, pos).toLowerCase();
+            break;
+          }
+          case "sha1": {
+            const valStart = pos;
+            while (pos < inner.length && inner[pos] !== " ") pos++;
+            currentRom.sha1 = inner.substring(valStart, pos).toLowerCase();
+            break;
+          }
+          default: {
+            if (pos < inner.length && inner[pos] === '"') {
+              pos++;
+              while (pos < inner.length && inner[pos] !== '"') pos++;
+              pos++;
+            } else {
+              while (pos < inner.length && inner[pos] !== " ") pos++;
+            }
+            break;
+          }
+        }
+      }
 
       // Check if this is a single-line ROM entry (ends with ` )`)
       if (trimmed.endsWith(" )")) {
@@ -412,18 +470,19 @@ function parseClrMameProDAT(
 
       currentRom = {};
     } else if (inRom && trimmed) {
-      // Parse individual attributes on separate lines
-      const nameMatch = trimmed.match(/name\s+"([^"]+)"/);
-      const sizeMatch = trimmed.match(/size\s+(\d+)/);
-      const crcMatch = trimmed.match(/crc\s+([a-fA-F0-9]+)/);
-      const md5Match = trimmed.match(/md5\s+([a-fA-F0-9]+)/);
-      const sha1Match = trimmed.match(/sha1\s+([a-fA-F0-9]+)/);
-
-      if (nameMatch) currentRom.name = nameMatch[1];
-      if (sizeMatch) currentRom.size = parseInt(sizeMatch[1]);
-      if (crcMatch) currentRom.crc32 = crcMatch[1].toUpperCase();
-      if (md5Match) currentRom.md5 = md5Match[1].toLowerCase();
-      if (sha1Match) currentRom.sha1 = sha1Match[1].toLowerCase();
+      if (trimmed.startsWith("name ")) {
+        const q1 = trimmed.indexOf('"');
+        const q2 = trimmed.indexOf('"', q1 + 1);
+        currentRom.name = trimmed.substring(q1 + 1, q2);
+      } else if (trimmed.startsWith("size ")) {
+        currentRom.size = parseInt(trimmed.slice(5));
+      } else if (trimmed.startsWith("crc ")) {
+        currentRom.crc32 = trimmed.slice(4).toUpperCase();
+      } else if (trimmed.startsWith("md5 ")) {
+        currentRom.md5 = trimmed.slice(4).toLowerCase();
+      } else if (trimmed.startsWith("sha1 ")) {
+        currentRom.sha1 = trimmed.slice(5).toLowerCase();
+      }
     } else if (inGame && trimmed) {
       // Parse game-level attributes on separate lines
       const nameMatch = trimmed.match(/name\s+"([^"]+)"/);
@@ -448,7 +507,7 @@ function parseClrMameProDAT(
 // Detect platform from filename patterns and content
 function detectPlatformFromName(filename: string, size: number): string {
   const name = filename.toLowerCase();
-  const ext = filename.toLowerCase().substring(filename.lastIndexOf("."));
+  const ext = name.substring(name.lastIndexOf("."));
 
   // Use the centralized extension mapping from datLoader
   // Import dynamically to avoid circular dependencies
@@ -756,7 +815,7 @@ export function validateROM(
 // Download and cache popular DAT files
 export async function loadDATFiles(): Promise<DATEntry[]> {
   // Import the DAT loader for bundled files
-  const { loadAllBundledDATs } = await import("./datLoader");
+
   return await loadAllBundledDATs();
 }
 
@@ -787,7 +846,6 @@ async function determinePlatforms(
   }
 
   // For other files, use the extension map from datLoader
-  const { getPlatformsForFile } = await import("./datLoader");
   const platforms = getPlatformsForFile(file.name);
 
   if (platforms.length > 0) {
@@ -848,8 +906,6 @@ export async function validateROMs(
     // then load those DATs in parallel. Disc header detection for ISOs happens
     // per-file during validation since it requires reading the file.
     onProgress?.(0, validFiles.length, "", "loading-dats", 0);
-
-    const { loadPlatformDAT } = await import("./datLoader");
 
     // Determine which platforms we need based on file extensions and sizes
     let platformsNeeded: string[];
@@ -1014,6 +1070,12 @@ async function processFilesParallel(
   const largeFiles = validFiles.filter((f) => f.size > LARGE_FILE_THRESHOLD);
   const smallFiles = validFiles.filter((f) => f.size <= LARGE_FILE_THRESHOLD);
 
+  // Pre-build file-to-index map to avoid O(n) indexOf scans
+  const fileIndexMap = new Map<File, number>();
+  for (let i = 0; i < validFiles.length; i++) {
+    fileIndexMap.set(validFiles[i], i);
+  }
+
   // Process small files in parallel batches
   if (smallFiles.length > 0) {
     const batchSize = Math.min(smallFiles.length, workerCount);
@@ -1022,76 +1084,82 @@ async function processFilesParallel(
     while (processedCount < smallFiles.length) {
       if (abortSignal?.aborted) break;
 
-      const batch = smallFiles.slice(processedCount, processedCount + batchSize);
+      const batchEnd = Math.min(processedCount + batchSize, smallFiles.length);
 
-      const batchPromises = batch.map(async (file, batchIndex) => {
-        const globalIndex = validFiles.indexOf(file);
+      const batchPromises = [];
+      for (let b = processedCount; b < batchEnd; b++) {
+        const file = smallFiles[b];
+        const globalIndex = fileIndexMap.get(file)!;
 
-      onProgress?.(globalIndex + 1, validFiles.length, file.name, "hashing", 0);
+        batchPromises.push(
+          (async () => {
+            onProgress?.(globalIndex + 1, validFiles.length, file.name, "hashing", 0);
 
-      try {
-        const hashes = await calculateFileHashes(
-          file,
-          (hashProgress) => {
-            onProgress?.(
-              globalIndex + 1,
-              validFiles.length,
-              file.name,
-              "hashing",
-              hashProgress,
-            );
-          },
-          workerCount,
+            try {
+              const hashes = await calculateFileHashes(
+                file,
+                (hashProgress) => {
+                  onProgress?.(
+                    globalIndex + 1,
+                    validFiles.length,
+                    file.name,
+                    "hashing",
+                    hashProgress,
+                  );
+                },
+                workerCount,
+              );
+
+              onProgress?.(
+                globalIndex + 1,
+                validFiles.length,
+                file.name,
+                "loading-dats",
+                100,
+              );
+
+              const result = await processSingleFileValidation(
+                file,
+                hashes,
+                onProgress,
+                globalIndex,
+                validFiles.length,
+                forcePlatform,
+                datCache,
+                datSourceCache,
+              );
+              return result;
+            } catch (error) {
+              // Per-file error: record a failure result and continue
+              console.error(`Error processing ${file.name}:`, error);
+              const isOutOfMemory =
+                error instanceof Error &&
+                (error.name === "OutOfMemoryError" ||
+                  error.message.includes("allocation") ||
+                  error.message.includes("memory") ||
+                  error.message.includes("out of memory"));
+
+              return {
+                filename: file.name,
+                originalName: file.name,
+                status: "unknown" as const,
+                size: file.size,
+                hashes: { md5: "", sha1: "", crc32: "" },
+                issues: [
+                  isOutOfMemory
+                    ? "Out of memory — file too large to process. Try processing large files individually."
+                    : `Processing error: ${error instanceof Error ? error.message : String(error)}`,
+                ],
+                file,
+              };
+            }
+          })(),
         );
-
-        onProgress?.(
-          globalIndex + 1,
-          validFiles.length,
-          file.name,
-          "loading-dats",
-          100,
-        );
-
-        const result = await processSingleFileValidation(
-          file,
-          hashes,
-          onProgress,
-          globalIndex,
-          validFiles.length,
-          forcePlatform,
-          datCache,
-          datSourceCache,
-        );
-        return result;
-      } catch (error) {
-        // Per-file error: record a failure result and continue
-        console.error(`Error processing ${file.name}:`, error);
-        const isOutOfMemory =
-          error instanceof Error &&
-          (error.name === "OutOfMemoryError" ||
-            error.message.includes("allocation") ||
-            error.message.includes("memory") ||
-            error.message.includes("out of memory"));
-
-        return {
-          filename: file.name,
-          originalName: file.name,
-          status: "unknown" as const,
-          size: file.size,
-          hashes: { md5: "", sha1: "", crc32: "" },
-          issues: [
-            isOutOfMemory
-              ? "Out of memory — file too large to process. Try processing large files individually."
-              : `Processing error: ${error instanceof Error ? error.message : String(error)}`,
-          ],
-          file,
-        };
       }
-    });
 
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults);
-      processedCount += batch.length;
+      processedCount += batchSize;
     }
   }
 
@@ -1099,7 +1167,7 @@ async function processFilesParallel(
   for (const file of largeFiles) {
     if (abortSignal?.aborted) break;
 
-    const globalIndex = validFiles.indexOf(file);
+    const globalIndex = fileIndexMap.get(file)!;
     onProgress?.(globalIndex + 1, validFiles.length, file.name, "hashing", 0);
 
     try {
@@ -1184,7 +1252,6 @@ async function processSingleFileValidation(
   onProgress?.(currentIndex + 1, totalFiles, file.name, "validating", 0);
 
   // Helper: get DAT entries for a platform, loading on demand if not cached
-  const { loadPlatformDAT } = await import("./datLoader");
   const getEntries = async (platform: string): Promise<DATEntry[]> => {
     if (datCache?.has(platform)) return datCache.get(platform)!;
     // Not pre-loaded — fetch on demand and cache for future files

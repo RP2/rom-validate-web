@@ -89,25 +89,9 @@ function isPSPDisc(data: Uint8Array): boolean {
     return false;
   }
 
-  // Look for "PSP_GAME" string in the volume descriptor or root directory
-  // This is a simplified check - look for the string in the first 32KB
-  const searchString = "PSP_GAME";
-  const searchLength = Math.min(data.length, 32 * 1024);
-
-  for (let i = 0; i <= searchLength - searchString.length; i++) {
-    let match = true;
-    for (let j = 0; j < searchString.length; j++) {
-      if (data[i + j] !== searchString.charCodeAt(j)) {
-        match = false;
-        break;
-      }
-    }
-    if (match) {
-      return true;
-    }
-  }
-
-  return false;
+  const decoder = new TextDecoder("ascii");
+  const header = decoder.decode(data.subarray(0, Math.min(data.length, 32768)));
+  return header.includes("PSP_GAME");
 }
 
 /**
@@ -121,56 +105,15 @@ function isPS2Disc(data: Uint8Array): boolean {
     return false;
   }
 
-  // Look for PlayStation-specific markers
-  // Check for "PLAYSTATION" string (case insensitive)
-  const markers = ["PLAYSTATION", "PS2DVD", "CD001"];
-  const searchLength = Math.min(data.length, 32 * 1024);
-
-  for (const marker of markers) {
-    for (let i = 0; i <= searchLength - marker.length; i++) {
-      let match = true;
-      for (let j = 0; j < marker.length; j++) {
-        const charCode = data[i + j];
-        const expectedChar = marker.charCodeAt(j);
-        // Case-insensitive comparison
-        if (
-          charCode !== expectedChar &&
-          charCode !== expectedChar + 32 &&
-          charCode !== expectedChar - 32
-        ) {
-          match = false;
-          break;
-        }
-      }
-      if (match) {
-        return true;
-      }
-    }
-  }
-
-  // Check for SYSTEM.CNF reference (common in PS2 discs)
-  const cnfString = "SYSTEM.CNF";
-  for (let i = 0; i <= searchLength - cnfString.length; i++) {
-    let match = true;
-    for (let j = 0; j < cnfString.length; j++) {
-      const charCode = data[i + j];
-      const expectedChar = cnfString.charCodeAt(j);
-      // Case-insensitive
-      if (
-        charCode !== expectedChar &&
-        charCode !== expectedChar + 32 &&
-        charCode !== expectedChar - 32
-      ) {
-        match = false;
-        break;
-      }
-    }
-    if (match) {
-      return true;
-    }
-  }
-
-  return false;
+  const decoder = new TextDecoder("ascii");
+  const header = decoder
+    .decode(data.subarray(0, Math.min(data.length, 32768)))
+    .toUpperCase();
+  return (
+    header.includes("PLAYSTATION") ||
+    header.includes("PS2DVD") ||
+    header.includes("SYSTEM.CNF")
+  );
 }
 
 /**
@@ -180,33 +123,11 @@ function isPS2Disc(data: Uint8Array): boolean {
 function isISO9660(data: Uint8Array): boolean {
   if (data.length < 0x8000) return false;
 
-  // Check for ISO9660 primary volume descriptor at offset 0x8000
-  // Should start with '\x01CD001\x01' or similar
-  const isoOffset = 0x8000;
-
-  // Check for CD001 signature (ISO9660 identifier)
-  if (
-    data[isoOffset + 1] === 0x43 && // C
-    data[isoOffset + 2] === 0x44 && // D
-    data[isoOffset + 3] === 0x30 && // 0
-    data[isoOffset + 4] === 0x30 && // 0
-    data[isoOffset + 5] === 0x31 // 1
-  ) {
-    return true;
-  }
-
-  // Alternative: Check at 0x800 (some formats use this offset)
-  const altOffset = 0x800;
-  if (
-    data[altOffset + 1] === 0x43 &&
-    data[altOffset + 2] === 0x44 &&
-    data[altOffset + 3] === 0x30 &&
-    data[altOffset + 4] === 0x30 &&
-    data[altOffset + 5] === 0x31
-  ) {
-    return true;
-  }
-
+  const decoder = new TextDecoder("ascii");
+  const atPrimary = decoder.decode(data.subarray(0x8001, 0x8006));
+  if (atPrimary === "CD001") return true;
+  const atAlt = decoder.decode(data.subarray(0x801, 0x806));
+  if (atAlt === "CD001") return true;
   return false;
 }
 

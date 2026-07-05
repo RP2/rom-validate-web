@@ -390,6 +390,48 @@ export function clearDATCache(): void {
   }
 }
 
+interface ScannedCachedDAT {
+  key: string;
+  source: string;
+  platform: string;
+  timestamp: number;
+  version: string;
+  entries: DATEntry[];
+  jsonString: string;
+}
+
+function scanCachedDATs(): ScannedCachedDAT[] {
+  const results: ScannedCachedDAT[] = [];
+  try {
+    const keys = Object.keys(localStorage);
+    for (const key of keys) {
+      if (!key.startsWith("dat-cache-")) continue;
+      const jsonString = localStorage.getItem(key);
+      if (!jsonString) continue;
+      try {
+        const cachedData: CachedDATData = JSON.parse(jsonString);
+        const keyParts = key.replace("dat-cache-", "").split("-");
+        const source = keyParts[0];
+        const platform = keyParts.slice(1).join("-");
+        results.push({
+          key,
+          source,
+          platform,
+          timestamp: cachedData.timestamp,
+          version: cachedData.version,
+          entries: cachedData.entries,
+          jsonString,
+        });
+      } catch (parseError) {
+        console.warn("Failed to parse cached DAT:", key, parseError);
+      }
+    }
+  } catch (error) {
+    console.warn("Failed to scan cached DATs:", error);
+  }
+  return results;
+}
+
 // Get cache status for debugging
 export async function getCacheStatus(): Promise<{
   memory: number;
@@ -397,60 +439,22 @@ export async function getCacheStatus(): Promise<{
   bundled: number;
   totalSize: string;
 }> {
-  // Only count items actually in memory cache
   const memoryCount = datCache.size;
+  const bundledCount = Object.keys(BUNDLED_DATS).length;
 
   let persistentCount = 0;
   let totalSize = 0;
 
-  // Count bundled DATs that are available (from BUNDLED_DATS config)
-  const bundledCount = Object.keys(BUNDLED_DATS).length;
-
-  try {
-    const keys = Object.keys(localStorage);
-    for (const key of keys) {
-      if (key.startsWith("dat-cache-")) {
-        const jsonString = localStorage.getItem(key);
-        if (jsonString) {
-          try {
-            const cachedData: CachedDATData = JSON.parse(jsonString);
-
-            // Extract platform and source from cache key
-            const keyParts = key.replace("dat-cache-", "").split("-");
-            const source = keyParts[0];
-
-            // Only count non-bundled DATs in persistent storage
-            if (source !== "bundled") {
-              persistentCount++;
-
-              if (cachedData.entries) {
-                // Calculate size based on the entries data structure
-                const entriesSize = JSON.stringify(cachedData.entries).length;
-                totalSize += entriesSize;
-              } else {
-                // Fallback to total JSON string length
-                totalSize += jsonString.length;
-              }
-            }
-          } catch (parseError) {
-            console.warn(
-              "Failed to parse cached DAT for size calculation:",
-              key,
-              parseError,
-            );
-            // Fallback to JSON string length for non-bundled DATs
-            const keyParts = key.replace("dat-cache-", "").split("-");
-            const source = keyParts[0];
-            if (source !== "bundled") {
-              persistentCount++;
-              totalSize += jsonString.length;
-            }
-          }
-        }
+  const scanned = scanCachedDATs();
+  for (const item of scanned) {
+    if (item.source !== "bundled") {
+      persistentCount++;
+      if (item.entries) {
+        totalSize += JSON.stringify(item.entries).length;
+      } else {
+        totalSize += item.jsonString.length;
       }
     }
-  } catch (error) {
-    console.warn("Failed to get cache status:", error);
   }
 
   return {
@@ -475,46 +479,19 @@ export async function getCachedDATs(): Promise<
     entryCount: number;
   }> = [];
 
-  // First check localStorage for non-bundled cached DATs (libretro and custom)
-  try {
-    const keys = Object.keys(localStorage);
-    for (const key of keys) {
-      if (key.startsWith("dat-cache-")) {
-        const jsonString = localStorage.getItem(key);
-        if (jsonString) {
-          try {
-            const cachedData: CachedDATData = JSON.parse(jsonString);
-
-            // Check if cache is still valid
-            const now = Date.now();
-            const isExpired =
-              now - cachedData.timestamp > CACHE_EXPIRY_HOURS * 60 * 60 * 1000;
-            const isValidVersion = cachedData.version === CACHE_VERSION;
-
-            if (!isExpired && isValidVersion && cachedData.entries) {
-              // Extract platform and source from cache key
-              // Format: "dat-cache-{source}-{platform}"
-              const keyParts = key.replace("dat-cache-", "").split("-");
-              const source = keyParts[0];
-              const platform = keyParts.slice(1).join("-");
-
-              // Skip bundled DATs since we handle them separately
-              if (source !== "bundled") {
-                cachedDATs.push({
-                  platform,
-                  source,
-                  entryCount: cachedData.entries.length,
-                });
-              }
-            }
-          } catch (parseError) {
-            console.warn("Failed to parse cached DAT:", key, parseError);
-          }
-        }
-      }
+  const scanned = scanCachedDATs();
+  const now = Date.now();
+  for (const item of scanned) {
+    if (item.source === "bundled") continue;
+    const isExpired = now - item.timestamp > CACHE_EXPIRY_HOURS * 60 * 60 * 1000;
+    const isValidVersion = item.version === CACHE_VERSION;
+    if (!isExpired && isValidVersion && item.entries) {
+      cachedDATs.push({
+        platform: item.platform,
+        source: item.source,
+        entryCount: item.entries.length,
+      });
     }
-  } catch (error) {
-    console.warn("Failed to get cached DATs:", error);
   }
 
   // Now check bundled DATs - always show them since they're built into the app

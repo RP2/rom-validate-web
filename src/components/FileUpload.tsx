@@ -104,38 +104,17 @@ export default function FileUpload() {
 
   // Prevent default browser behavior for drag and drop
   useEffect(() => {
-    const preventDefaults = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
-    const handleGlobalDrop = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
-    // Add event listeners to prevent default browser behavior
-    document.addEventListener("dragover", preventDefaults);
-    document.addEventListener("drop", handleGlobalDrop);
-
-    return () => {
-      document.removeEventListener("dragover", preventDefaults);
-      document.removeEventListener("drop", handleGlobalDrop);
-    };
-  }, []);
-
-  // Global drag event handlers to prevent browser default behavior
-  useEffect(() => {
     const handleGlobalDragOver = (e: DragEvent) => {
       e.preventDefault();
       e.dataTransfer!.dropEffect = "copy";
+      e.stopPropagation();
     };
 
     const handleGlobalDrop = (e: DragEvent) => {
       e.preventDefault();
+      e.stopPropagation();
     };
 
-    // Add global listeners to prevent browser from opening files
     document.addEventListener("dragover", handleGlobalDragOver);
     document.addEventListener("drop", handleGlobalDrop);
 

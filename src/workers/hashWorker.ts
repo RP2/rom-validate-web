@@ -272,9 +272,11 @@ class Md5Calculator {
       view2.setUint32(i * 4, this.state[i], true);
     }
 
-    return Array.from(result)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
+    let hex = "";
+    for (let i = 0; i < 16; i++) {
+      hex += result[i].toString(16).padStart(2, "0");
+    }
+    return hex;
   }
 }
 
