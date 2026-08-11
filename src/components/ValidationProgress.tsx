@@ -1,4 +1,3 @@
-import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -30,11 +29,7 @@ interface ValidationStats {
   processedFiles: number;
   currentFile?: string;
   currentStage:
-    | "initializing"
-    | "hashing"
-    | "loading-dats"
-    | "validating"
-    | "completed";
+    "initializing" | "hashing" | "loading-dats" | "validating" | "completed";
   timeStarted: number;
   estimatedTimeRemaining?: number;
   averageFileTime?: number;
@@ -85,7 +80,10 @@ export default function ValidationProgress({
   const processingCount = useMemo(
     () =>
       files.filter(
-        (f) => f.status === "hashing" || f.status === "validating" || f.status === "processing",
+        (f) =>
+          f.status === "hashing" ||
+          f.status === "validating" ||
+          f.status === "processing",
       ).length,
     [files],
   );
@@ -101,7 +99,11 @@ export default function ValidationProgress({
     // Each file contributes: completed=100%, processing=its progress%, pending=0%
     const totalProgress = files.reduce((sum, f) => {
       if (f.status === "completed" || f.status === "error") return sum + 100;
-      if (f.status === "hashing" || f.status === "validating" || f.status === "processing")
+      if (
+        f.status === "hashing" ||
+        f.status === "validating" ||
+        f.status === "processing"
+      )
         return sum + f.progress;
       return sum;
     }, 0);
@@ -200,16 +202,18 @@ export default function ValidationProgress({
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <motion.div
-              animate={{ rotate: stats.currentStage !== "completed" ? 360 : 0 }}
-              transition={{
-                duration: 2,
-                repeat: stats.currentStage !== "completed" ? Infinity : 0,
-                ease: "linear",
-              }}
+            <div
+              className={
+                stats.currentStage !== "completed" ? "animate-spin" : ""
+              }
+              style={
+                stats.currentStage !== "completed"
+                  ? { animationDuration: "2s" }
+                  : undefined
+              }
             >
               {stageInfo.icon}
-            </motion.div>
+            </div>
             Validation Progress
           </CardTitle>
           <div className="flex items-center gap-2">
@@ -249,7 +253,9 @@ export default function ValidationProgress({
               <span>Elapsed: {formatTime(timeElapsedMs)}</span>
             </div>
             {estimatedTimeRemainingMs && stats.currentStage !== "completed" && (
-              <span>Est. remaining: {formatTime(estimatedTimeRemainingMs)}</span>
+              <span>
+                Est. remaining: {formatTime(estimatedTimeRemainingMs)}
+              </span>
             )}
           </div>
         </div>
@@ -261,30 +267,24 @@ export default function ValidationProgress({
               {processingCount > 0 && (
                 <div className="flex items-center gap-1.5">
                   <Loader2 className="text-primary h-3.5 w-3.5 animate-spin" />
-                  <span>
-                    {processingCount} processing
-                  </span>
+                  <span>{processingCount} processing</span>
                 </div>
               )}
               {completedCount > 0 && (
                 <div className="flex items-center gap-1.5">
                   <CheckCircle className="h-3.5 w-3.5 text-green-600" />
-                  <span>
-                    {completedCount} done
-                  </span>
+                  <span>{completedCount} done</span>
                 </div>
               )}
               {pendingCount > 0 && (
                 <div className="flex items-center gap-1.5">
                   <Clock className="text-muted-foreground h-3.5 w-3.5" />
-                  <span>
-                    {pendingCount} queued
-                  </span>
+                  <span>{pendingCount} queued</span>
                 </div>
               )}
               {errorCount > 0 && (
                 <div className="flex items-center gap-1.5">
-                  <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+                  <AlertCircle className="text-destructive h-3.5 w-3.5" />
                   <span>
                     {errorCount} error{errorCount !== 1 ? "s" : ""}
                   </span>
@@ -301,48 +301,45 @@ export default function ValidationProgress({
               File Details
             </h4>
             <div className="max-h-48 space-y-1 overflow-x-hidden overflow-y-auto">
-              <AnimatePresence>
-                {files.map((file, index) => (
-                  <motion.div
-                    key={file.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ delay: index * 0.05 }}
-                    className={`flex items-center justify-between gap-3 rounded-md p-2 text-xs ${
-                      file.status === "completed"
-                        ? "border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950"
-                        : file.status === "error"
-                          ? "border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950"
-                          : file.status !== "pending"
-                            ? "bg-primary/10 border-primary/20 border"
-                            : "bg-muted border-border border"
-                    }`}
-                  >
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
-                      {getFileStatusIcon(file.status)}
-                      <span className="truncate font-mono">{file.name}</span>
-                      {file.platform && (
-                        <Badge variant="outline" className="px-1 py-0 text-xs">
-                          {file.platform}
-                        </Badge>
-                      )}
-                    </div>
+              {files.map((file, index) => (
+                <div
+                  key={file.id}
+                  style={{
+                    animation: `fade-slide-in 0.3s ease ${index * 0.05}s both`,
+                  }}
+                  className={`flex items-center justify-between gap-3 rounded-md p-2 text-xs ${
+                    file.status === "completed"
+                      ? "border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950"
+                      : file.status === "error"
+                        ? "border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950"
+                        : file.status !== "pending"
+                          ? "bg-primary/10 border-primary/20 border"
+                          : "bg-muted border-border border"
+                  }`}
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    {getFileStatusIcon(file.status)}
+                    <span className="truncate font-mono">{file.name}</span>
+                    {file.platform && (
+                      <Badge variant="outline" className="px-1 py-0 text-xs">
+                        {file.platform}
+                      </Badge>
+                    )}
+                  </div>
 
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="text-muted-foreground">
-                        {formatFileSize(file.size)}
-                      </span>
-                      {file.status !== "pending" &&
-                        file.status !== "completed" && (
-                          <div className="w-12">
-                            <Progress value={file.progress} className="h-1" />
-                          </div>
-                        )}
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-muted-foreground">
+                      {formatFileSize(file.size)}
+                    </span>
+                    {file.status !== "pending" &&
+                      file.status !== "completed" && (
+                        <div className="w-12">
+                          <Progress value={file.progress} className="h-1" />
+                        </div>
+                      )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

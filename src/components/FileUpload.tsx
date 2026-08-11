@@ -47,11 +47,7 @@ interface ValidationStats {
   processedFiles: number;
   currentFile?: string;
   currentStage:
-    | "initializing"
-    | "hashing"
-    | "loading-dats"
-    | "validating"
-    | "completed";
+    "initializing" | "hashing" | "loading-dats" | "validating" | "completed";
   timeStarted: number;
 }
 
@@ -250,7 +246,9 @@ export default function FileUpload() {
   const addFiles = (newFiles: File[]) => {
     // Skip duplicates: same name + same size = likely the same file
     setFiles((prev) => {
-      const existing = new Set(prev.map((f) => `${f.file.name}|${f.file.size}`));
+      const existing = new Set(
+        prev.map((f) => `${f.file.name}|${f.file.size}`),
+      );
       const unique = newFiles.filter(
         (f) => !existing.has(`${f.name}|${f.size}`),
       );
@@ -263,9 +261,13 @@ export default function FileUpload() {
       }
 
       if (unique.length < newFiles.length) {
-        toast.info(`${newFiles.length - unique.length} duplicate file(s) skipped`, {
-          description: "Files with the same name and size are already in the queue.",
-        });
+        toast.info(
+          `${newFiles.length - unique.length} duplicate file(s) skipped`,
+          {
+            description:
+              "Files with the same name and size are already in the queue.",
+          },
+        );
       }
 
       const fileObjects: UploadedFile[] = unique.map((file) => ({
@@ -410,9 +412,10 @@ export default function FileUpload() {
                 if (pIdx !== pendingIndex) return f; // Not this file — skip
 
                 // Mark as completed if progress is 100, otherwise processing
-                const newStatus = fileProgress >= 100
-                  ? ("completed" as const)
-                  : ("processing" as const);
+                const newStatus =
+                  fileProgress >= 100
+                    ? ("completed" as const)
+                    : ("processing" as const);
 
                 return {
                   ...f,
@@ -575,10 +578,16 @@ export default function FileUpload() {
               isDragOver ? "text-primary" : "text-foreground"
             }`}
           >
-            {isDragOver ? "Drop files here!" : files.length > 0 ? `${files.length} file${files.length !== 1 ? "s" : ""} ready to validate` : "Drop ROM files here"}
+            {isDragOver
+              ? "Drop files here!"
+              : files.length > 0
+                ? `${files.length} file${files.length !== 1 ? "s" : ""} ready to validate`
+                : "Drop ROM files here"}
           </h3>
           <p className="text-muted-foreground mb-4">
-            {files.length > 0 ? "Add more files or click Validate below" : "or click to browse your files"}
+            {files.length > 0
+              ? "Add more files or click Validate below"
+              : "or click to browse your files"}
           </p>
           <Button
             variant="outline"
@@ -718,7 +727,10 @@ export default function FileUpload() {
             <div className="mt-6 flex gap-3">
               <Button
                 onClick={startValidation}
-                disabled={isValidating || files.filter((f) => f.status === "pending").length === 0}
+                disabled={
+                  isValidating ||
+                  files.filter((f) => f.status === "pending").length === 0
+                }
                 className="flex-1"
               >
                 {isValidating ? (

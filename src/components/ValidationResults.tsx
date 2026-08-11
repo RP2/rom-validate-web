@@ -96,7 +96,10 @@ export default function ValidationResults() {
     window.addEventListener("validationResultsUpdated", handleResultsUpdated);
 
     return () => {
-      window.removeEventListener("validationResultsUpdated", handleResultsUpdated);
+      window.removeEventListener(
+        "validationResultsUpdated",
+        handleResultsUpdated,
+      );
     };
   }, []);
 
@@ -198,7 +201,8 @@ export default function ValidationResults() {
         },
         ...(result.platform && { platform: result.platform }),
         ...(result.region && { region: result.region }),
-        ...(result.issues && result.issues.length > 0 && { issues: result.issues }),
+        ...(result.issues &&
+          result.issues.length > 0 && { issues: result.issues }),
       }));
 
       const json = JSON.stringify(exportData, null, 2);
@@ -213,7 +217,9 @@ export default function ValidationResults() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast.success(`Exported ${unknownFiles.length} unknown file${unknownFiles.length !== 1 ? "s" : ""} as JSON`);
+      toast.success(
+        `Exported ${unknownFiles.length} unknown file${unknownFiles.length !== 1 ? "s" : ""} as JSON`,
+      );
     } catch (error) {
       console.error("Error exporting unknown list:", error);
       toast.error("Error exporting unknown list. Please try again.");
@@ -602,11 +608,9 @@ export default function ValidationResults() {
                                         <div>
                                           {getDATSourceURL(result.datSource) ? (
                                             <a
-                                              href={
-                                                getDATSourceURL(
-                                                  result.datSource,
-                                                )!
-                                              }
+                                              href={getDATSourceURL(
+                                                result.datSource,
+                                              )!}
                                               target="_blank"
                                               rel="noopener noreferrer"
                                               className="inline-block"
@@ -785,7 +789,11 @@ export default function ValidationResults() {
           <div className="border-border mt-6 flex justify-between border-t pt-6">
             <div className="flex gap-3">
               {filesToRename.length > 0 && (
-                <Button variant="outline" onClick={handleApplyRenames} disabled={isZipping}>
+                <Button
+                  variant="outline"
+                  onClick={handleApplyRenames}
+                  disabled={isZipping}
+                >
                   {isZipping ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />

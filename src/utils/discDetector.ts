@@ -2,11 +2,7 @@
 // Provides more accurate detection than size-based heuristics
 
 export type DiscPlatform =
-  | "PlayStation 2"
-  | "Wii"
-  | "GameCube"
-  | "PSP"
-  | "unknown";
+  "PlayStation 2" | "Wii" | "GameCube" | "PSP" | "unknown";
 
 // Size of header to read (64KB is enough for all disc formats)
 const HEADER_SIZE = 64 * 1024;

@@ -230,21 +230,29 @@ export async function loadBundledDAT(platform: string): Promise<DATEntry[]> {
 }
 
 // Load DAT file from Libretro database with retry
-async function fetchWithRetry(url: string, retries: number = 1, delayMs: number = 1000): Promise<Response> {
+async function fetchWithRetry(
+  url: string,
+  retries: number = 1,
+  delayMs: number = 1000,
+): Promise<Response> {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const response = await fetch(url);
       if (response.ok) return response;
       // Only retry on server errors (5xx) or network issues, not 404s
       if (response.status >= 500 && attempt < retries) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
+        await new Promise((resolve) =>
+          setTimeout(resolve, delayMs * (attempt + 1)),
+        );
         continue;
       }
       return response; // Return the error response for the caller to handle
     } catch (error) {
       // Network error — retry if we have attempts left
       if (attempt < retries) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs * (attempt + 1)));
+        await new Promise((resolve) =>
+          setTimeout(resolve, delayMs * (attempt + 1)),
+        );
         continue;
       }
       throw error;
@@ -483,7 +491,8 @@ export async function getCachedDATs(): Promise<
   const now = Date.now();
   for (const item of scanned) {
     if (item.source === "bundled") continue;
-    const isExpired = now - item.timestamp > CACHE_EXPIRY_HOURS * 60 * 60 * 1000;
+    const isExpired =
+      now - item.timestamp > CACHE_EXPIRY_HOURS * 60 * 60 * 1000;
     const isValidVersion = item.version === CACHE_VERSION;
     if (!isExpired && isValidVersion && item.entries) {
       cachedDATs.push({

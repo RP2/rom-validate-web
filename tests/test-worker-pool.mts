@@ -93,7 +93,10 @@ assert(pool1.activeCount === 3, "3 active tasks remaining");
 pool1.complete("file-2");
 pool1.complete("file-3");
 pool1.complete("file-4");
-assert(pool1.availableCount === 4, "All workers returned after all completions");
+assert(
+  pool1.availableCount === 4,
+  "All workers returned after all completions",
+);
 assert(pool1.activeCount === 0, "No active tasks remaining");
 
 // Test: Queue processes when workers become available
@@ -170,30 +173,41 @@ console.log("\n📋 Large File Separation Tests");
 const LARGE_FILE_THRESHOLD = 1024 * 1024 * 1024; // 1GB
 
 const testFiles = [
-  { name: "small-game.gba", size: 16 * 1024 * 1024 },     // 16MB
-  { name: "medium-game.nds", size: 128 * 1024 * 1024 },    // 128MB
+  { name: "small-game.gba", size: 16 * 1024 * 1024 }, // 16MB
+  { name: "medium-game.nds", size: 128 * 1024 * 1024 }, // 128MB
   { name: "large-game.iso", size: 4 * 1024 * 1024 * 1024 }, // 4GB
-  { name: "huge-game.iso", size: 8 * 1024 * 1024 * 1024 },  // 8GB
+  { name: "huge-game.iso", size: 8 * 1024 * 1024 * 1024 }, // 8GB
 ];
 
-const largeFiles = testFiles.filter(f => f.size > LARGE_FILE_THRESHOLD);
-const smallFiles = testFiles.filter(f => f.size <= LARGE_FILE_THRESHOLD);
+const largeFiles = testFiles.filter((f) => f.size > LARGE_FILE_THRESHOLD);
+const smallFiles = testFiles.filter((f) => f.size <= LARGE_FILE_THRESHOLD);
 
 assert(largeFiles.length === 2, "2 files exceed 1GB threshold");
 assert(smallFiles.length === 2, "2 files are under 1GB threshold");
-assert(largeFiles.every(f => f.name.endsWith(".iso")), "Large files are ISOs");
-assert(smallFiles.every(f => !f.name.endsWith(".iso") || f.size <= LARGE_FILE_THRESHOLD), "Small files are not ISOs or are small ISOs");
+assert(
+  largeFiles.every((f) => f.name.endsWith(".iso")),
+  "Large files are ISOs",
+);
+assert(
+  smallFiles.every(
+    (f) => !f.name.endsWith(".iso") || f.size <= LARGE_FILE_THRESHOLD,
+  ),
+  "Small files are not ISOs or are small ISOs",
+);
 
 // ============================================================
 console.log("\n📋 Deduplication Logic Tests");
 // ============================================================
 
 // Simulate the dedup logic from FileUpload
-interface SimFile { name: string; size: number; }
+interface SimFile {
+  name: string;
+  size: number;
+}
 
 function dedupFiles(existing: SimFile[], incoming: SimFile[]): SimFile[] {
-  const existingKeys = new Set(existing.map(f => `${f.name}|${f.size}`));
-  return incoming.filter(f => !existingKeys.has(`${f.name}|${f.size}`));
+  const existingKeys = new Set(existing.map((f) => `${f.name}|${f.size}`));
+  return incoming.filter((f) => !existingKeys.has(`${f.name}|${f.size}`));
 }
 
 const existing: SimFile[] = [
@@ -202,25 +216,33 @@ const existing: SimFile[] = [
 ];
 
 const incoming: SimFile[] = [
-  { name: "game1.gba", size: 16 * 1024 * 1024 },  // duplicate
-  { name: "game3.smc", size: 512 * 1024 },          // new
-  { name: "game2.nds", size: 64 * 1024 * 1024 },    // same name, different size
+  { name: "game1.gba", size: 16 * 1024 * 1024 }, // duplicate
+  { name: "game3.smc", size: 512 * 1024 }, // new
+  { name: "game2.nds", size: 64 * 1024 * 1024 }, // same name, different size
 ];
 
 const unique = dedupFiles(existing, incoming);
 assert(unique.length === 2, "2 unique files after dedup");
 assert(unique[0].name === "game3.smc", "game3.smc is unique");
-assert(unique[1].name === "game2.nds", "game2.nds with different size is unique");
+assert(
+  unique[1].name === "game2.nds",
+  "game2.nds with different size is unique",
+);
 
 // Same name AND same size = duplicate
-const exactDup = dedupFiles(existing, [{ name: "game1.gba", size: 16 * 1024 * 1024 }]);
+const exactDup = dedupFiles(existing, [
+  { name: "game1.gba", size: 16 * 1024 * 1024 },
+]);
 assert(exactDup.length === 0, "Exact duplicate is filtered out");
 
 // ============================================================
 console.log("\n📋 Worker Count Auto-Detection Tests");
 // ============================================================
 
-function getWorkerCount(autoValue: string, hardwareConcurrency: number | undefined): number {
+function getWorkerCount(
+  autoValue: string,
+  hardwareConcurrency: number | undefined,
+): number {
   const value = autoValue || "auto";
   if (value === "auto") {
     const cores = hardwareConcurrency ?? 4;
@@ -234,7 +256,10 @@ function getWorkerCount(autoValue: string, hardwareConcurrency: number | undefin
 assert(getWorkerCount("auto", 8) === 6, "8 cores → 6 workers (capped at max)");
 assert(getWorkerCount("auto", 2) === 2, "2 cores → 2 workers (min)");
 assert(getWorkerCount("auto", 16) === 6, "16 cores → 6 workers (max)");
-assert(getWorkerCount("auto", undefined) === 3, "undefined cores → 3 workers (4-1)");
+assert(
+  getWorkerCount("auto", undefined) === 3,
+  "undefined cores → 3 workers (4-1)",
+);
 assert(getWorkerCount("4", 8) === 4, "explicit '4' → 4 workers");
 assert(getWorkerCount("1", 8) === 1, "explicit '1' → 1 worker");
 assert(getWorkerCount("10", 8) === 6, "explicit '10' → 6 workers (max)");

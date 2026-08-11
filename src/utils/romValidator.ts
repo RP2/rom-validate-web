@@ -1093,7 +1093,13 @@ async function processFilesParallel(
 
         batchPromises.push(
           (async () => {
-            onProgress?.(globalIndex + 1, validFiles.length, file.name, "hashing", 0);
+            onProgress?.(
+              globalIndex + 1,
+              validFiles.length,
+              file.name,
+              "hashing",
+              0,
+            );
 
             try {
               const hashes = await calculateFileHashes(

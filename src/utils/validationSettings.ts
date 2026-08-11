@@ -32,9 +32,10 @@ export function getParallelWorkerCount(): number {
 
   if (value === "auto") {
     // Use hardware concurrency but cap at 6 for safety
-    const cores = typeof navigator !== "undefined" && navigator.hardwareConcurrency
-      ? navigator.hardwareConcurrency
-      : 4;
+    const cores =
+      typeof navigator !== "undefined" && navigator.hardwareConcurrency
+        ? navigator.hardwareConcurrency
+        : 4;
     return Math.min(Math.max(cores - 1, 2), 6); // Leave 1 core for UI, min 2, max 6
   }
 

@@ -4,10 +4,10 @@ Validate ROM files against No-Intro and Redump databases directly in your browse
 
 ## Features
 
-- **Private** — All processing happens locally. Your ROMs never leave your device.
-- **Smart Detection** — Automatically identifies platforms from file size and filename.
-- **Fast** — Sequential DAT loading with caching for repeated validations.
-- **Cross-Platform** — Supports Nintendo, Sony, Sega, and more.
+- **Private** — All processing happens in your browser. No files are uploaded.
+- **Multi-Hash** — Checks MD5, SHA-1, and CRC32 for each file.
+- **Caching** — DAT files are cached for 24 hours to reduce downloads.
+- **15 Platforms** — Nintendo, Sony, and Sega systems via No-Intro and Redump.
 
 ## Supported Platforms
 

@@ -12,8 +12,8 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
 ---
 
 <Layout
-  title="About Auto ROM Validator by Riley"
-  description="Learn about ROM validation, DAT files, and how to preserve your game collection."
+  title="About Web ROM Validator"
+  description="Learn how Web ROM Validator checks ROM files against No-Intro and Redump databases in your browser."
 >
   <main class="container mx-auto max-w-4xl px-4 py-8">
     <div class="space-y-8">
@@ -23,7 +23,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
           About Web ROM Validator
         </h1>
         <p class="text-muted-foreground mx-auto max-w-2xl text-lg">
-          Understanding ROM validation and digital game preservation
+          Check ROM files against official databases in your browser
         </p>
       </div>
 
@@ -33,36 +33,46 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
           <h2 class="mb-4 text-2xl font-semibold">What is ROM Validation?</h2>
           <div class="space-y-4">
             <p class="text-muted-foreground">
-              ROM validation is the process of verifying that your game backup
-              files are authentic, complete, and match known good dumps. This
-              ensures that your preserved games are accurate representations of
-              the original cartridges or discs.
+              ROM validation checks that a ROM file matches a known good copy.
+              The app compares hashes from your file against hashes in a
+              database. This shows if your copy is correct and complete.
+            </p>
+
+            <p class="text-muted-foreground">
+              A DAT file stores the official game name and hash data for each
+              release. No-Intro and Redump publish these files. The app
+              downloads the DAT files it needs for each platform.
+            </p>
+
+            <p class="text-muted-foreground">
+              Validation does not fix corrupted files. It only shows if your
+              file matches the database. You can then rename files to match the
+              official name.
             </p>
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
               <Alert className="border-primary/20 bg-primary/5">
-                <AlertTitle className="text-primary">
-                  Hash Verification
-                </AlertTitle>
+                <AlertTitle className="text-primary"> Check Hashes </AlertTitle>
                 <AlertDescription>
-                  Uses MD5, SHA-1, and CRC32 checksums to verify file integrity
+                  The app calculates MD5, SHA-1, and CRC32 hashes for each file
                 </AlertDescription>
               </Alert>
 
               <Alert className="border-green-500/20 bg-green-500/5">
-                <AlertTitle className="text-green-600">DAT Matching</AlertTitle>
+                <AlertTitle className="text-green-600">Compare DATs</AlertTitle>
                 <AlertDescription>
-                  Compares against official No-Intro and Redump databases using
-                  .DAT files
+                  The app compares your hashes against official No-Intro and
+                  Redump DAT files
                 </AlertDescription>
               </Alert>
 
               <Alert className="border-blue-500/20 bg-blue-500/5">
                 <AlertTitle className="text-blue-600">
-                  Metadata Correction
+                  Rename Files
                 </AlertTitle>
                 <AlertDescription>
-                  Provides correct filenames and organizing information
+                  You can rename files to match the official names from the DAT
+                  files
                 </AlertDescription>
               </Alert>
             </div>
@@ -75,27 +85,31 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
         <div class="p-6">
           <h2 class="mb-2 text-2xl font-semibold">Supported Platforms</h2>
           <p class="text-muted-foreground mb-4">
-            Game systems with official DAT file support
+            The app supports these platforms through official DAT files
           </p>
-          <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-            <Badge variant="outline">Nintendo DS</Badge>
-            <Badge variant="outline">Nintendo DSi</Badge>
-            <Badge variant="outline">Nintendo 3DS</Badge>
+
+          <h3 class="mb-2 text-lg font-medium">No-Intro</h3>
+          <div
+            class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4"
+          >
+            <Badge variant="outline">Game Boy</Badge>
+            <Badge variant="outline">Game Boy Color</Badge>
             <Badge variant="outline">Game Boy Advance</Badge>
-            <Badge variant="outline">Game Boy / Color</Badge>
-            <Badge variant="outline">PSP</Badge>
+            <Badge variant="outline">Nintendo DS</Badge>
+            <Badge variant="outline">Nintendo 3DS</Badge>
+            <Badge variant="outline">NES</Badge>
+            <Badge variant="outline">SNES</Badge>
             <Badge variant="outline">Nintendo 64</Badge>
-            <Badge variant="outline">Super Nintendo</Badge>
-            <Badge variant="outline">
-              <span class="sm:hidden">NES</span>
-              <span class="hidden sm:inline">Nintendo Entertainment System</span
-              >
-            </Badge>
-            <Badge variant="outline">PlayStation</Badge>
-            <Badge variant="outline">PlayStation 2</Badge>
+            <Badge variant="outline">PSP</Badge>
+            <Badge variant="outline">Genesis / Mega Drive</Badge>
+          </div>
+
+          <h3 class="mb-2 text-lg font-medium">Redump</h3>
+          <div class="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
             <Badge variant="outline">GameCube</Badge>
             <Badge variant="outline">Wii</Badge>
-            <Badge variant="outline">Sega Genesis</Badge>
+            <Badge variant="outline">PlayStation</Badge>
+            <Badge variant="outline">PlayStation 2</Badge>
             <Badge variant="outline">Dreamcast</Badge>
           </div>
         </div>
@@ -115,11 +129,10 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
                 1
               </div>
               <div>
-                <h4 class="mb-1 font-semibold">Enhanced Progress Tracking</h4>
+                <h4 class="mb-1 font-semibold">Upload your files</h4>
                 <p class="text-muted-foreground text-sm">
-                  Real-time file-by-file progress with detailed stages, time
-                  estimates, and persistent display throughout the validation
-                  workflow.
+                  Drag and drop files onto the page, or click to select files.
+                  The app reads each file locally in your browser.
                 </p>
               </div>
             </div>
@@ -131,11 +144,10 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
                 2
               </div>
               <div>
-                <h4 class="mb-1 font-semibold">Upload Your Files</h4>
+                <h4 class="mb-1 font-semibold">The app detects the platform</h4>
                 <p class="text-muted-foreground text-sm">
-                  Select ROM files with drag & drop or file browser. Auto-scroll
-                  navigation keeps relevant content visible during upload and
-                  validation.
+                  The app checks file extensions, file size, and file names to
+                  guess the platform. You can also select the platform manually.
                 </p>
               </div>
             </div>
@@ -147,11 +159,10 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
                 3
               </div>
               <div>
-                <h4 class="mb-1 font-semibold">Smart Platform Detection</h4>
+                <h4 class="mb-1 font-semibold">The app calculates hashes</h4>
                 <p class="text-muted-foreground text-sm">
-                  Intelligent detection using file extensions, size analysis,
-                  and filename hints. Manual platform selection available for
-                  performance optimization.
+                  The app calculates MD5, SHA-1, and CRC32 hashes for each file.
+                  Web workers process files in parallel.
                 </p>
               </div>
             </div>
@@ -163,10 +174,10 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
                 4
               </div>
               <div>
-                <h4 class="mb-1 font-semibold">Hash Calculation</h4>
+                <h4 class="mb-1 font-semibold">The app gets DAT files</h4>
                 <p class="text-muted-foreground text-sm">
-                  Calculates MD5, SHA-1, and CRC32 hashes with full transparency
-                  and copy-to-clipboard functionality for easy verification.
+                  The app downloads DAT files from No-Intro or Redump. It uses
+                  cached DAT files when they are less than 24 hours old.
                 </p>
               </div>
             </div>
@@ -178,11 +189,25 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
                 5
               </div>
               <div>
-                <h4 class="mb-1 font-semibold">DAT Comparison</h4>
+                <h4 class="mb-1 font-semibold">The app compares hashes</h4>
                 <p class="text-muted-foreground text-sm">
-                  Compares against official DAT databases with transparent
-                  caching (shows cache vs fresh download), smart fallback, and
-                  automatic cleanup.
+                  The app compares your file hashes against the DAT database. It
+                  shows match, miss, and error results for each file.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-start gap-4">
+              <div
+                class="bg-primary text-primary-foreground flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold"
+              >
+                6
+              </div>
+              <div>
+                <h4 class="mb-1 font-semibold">You can rename or export</h4>
+                <p class="text-muted-foreground text-sm">
+                  You can rename a file to match the official DAT name. You can
+                  also copy results to the clipboard or export them.
                 </p>
               </div>
             </div>
@@ -190,126 +215,63 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
         </CardContent>
       </Card>
 
-      <!-- Advanced Features -->
+      <!-- Privacy -->
       <Card>
         <CardHeader>
-          <CardTitle>Advanced Features</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div class="space-y-4">
-              <h4 class="font-semibold">Enhanced User Experience</h4>
-              <ul class="text-muted-foreground space-y-2 text-sm">
-                <li>• Granular progress tracking with file-by-file status</li>
-                <li>• Persistent progress display throughout validation</li>
-                <li>
-                  • Smart clear functions (all files, progress only, results)
-                </li>
-                <li>• Auto-scroll navigation for optimal workflow</li>
-                <li>• Consistent visual theming with responsive design</li>
-              </ul>
-            </div>
-
-            <div class="space-y-4">
-              <h4 class="font-semibold">Platform Selection & Detection</h4>
-              <ul class="text-muted-foreground space-y-2 text-sm">
-                <li>• Manual platform override for faster validation</li>
-                <li>• Smart fallback to automatic detection if no match</li>
-                <li>
-                  • Size-based detection for multi-platform formats (.iso)
-                </li>
-                <li>• Filename keyword recognition (gc, ps2, wii, psp)</li>
-              </ul>
-            </div>
-
-            <div class="space-y-4">
-              <h4 class="font-semibold">DAT Management & Caching</h4>
-              <ul class="text-muted-foreground space-y-2 text-sm">
-                <li>• Multi-level caching with transparent status reporting</li>
-                <li>• Clear console logging (cached vs fresh downloads)</li>
-                <li>• Custom DAT upload support with persistent storage</li>
-                <li>• DAT browser with accordion interface and search</li>
-                <li>• Memory-first bundled DAT loading for performance</li>
-              </ul>
-            </div>
-
-            <div class="space-y-4">
-              <h4 class="font-semibold">Developer Tools</h4>
-              <ul class="text-muted-foreground space-y-2 text-sm">
-                <li>• Real-time cache status with accurate size tracking</li>
-                <li>
-                  • Browse cached DATs in formatted viewer with accordions
-                </li>
-                <li>• Clear cache functions with confirmation dialogs</li>
-                <li>• Source identification (bundled/libretro/custom)</li>
-                <li>• Consistent UI for all DAT sources and types</li>
-              </ul>
-            </div>
-
-            <div class="space-y-4">
-              <h4 class="font-semibold">Results & Export</h4>
-              <ul class="text-muted-foreground space-y-2 text-sm">
-                <li>• Status filtering with smart clear button management</li>
-                <li>• Detailed file information with interactive modals</li>
-                <li>• Hash transparency with one-click copy-to-clipboard</li>
-                <li>• Comprehensive export options and validation reports</li>
-                <li>• Labeled clear buttons for intuitive workflow control</li>
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <!-- Privacy & Security -->
-      <Card>
-        <CardHeader>
-          <CardTitle>Privacy & Security</CardTitle>
+          <CardTitle>Privacy</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert className="border-green-500/20 bg-green-500/5">
-            <AlertTitle className="text-green-600">Complete Privacy</AlertTitle>
+            <AlertTitle className="text-green-600"
+              >Your files stay on your device</AlertTitle
+            >
             <AlertDescription>
-              Your ROM files never leave your computer. All processing happens
-              locally in your browser - we only fetch public DAT files for
-              comparison and cache them intelligently with transparent reporting
-              (console logs show cached vs fresh downloads). Multi-level storage
-              (memory + 24-hour localStorage) improves performance while
-              minimizing traffic. Custom DAT files you upload are also processed
-              and stored entirely locally in your browser.
+              The app processes all files in your browser. It does not upload
+              ROM files to any server. The only network requests are for public
+              DAT files from No-Intro and Redump. The app caches these DAT
+              files in memory and in localStorage for 24 hours.
             </AlertDescription>
           </Alert>
 
           <Alert className="border-blue-500/20 bg-blue-500/5">
-            <AlertTitle className="text-blue-600">No Data Collection</AlertTitle
+            <AlertTitle className="text-blue-600"
+              >No tracking or analytics</AlertTitle
             >
             <AlertDescription>
-              This site uses Cloudflare for content delivery but does not track
-              users, store personal data, or use cookies. Only essential browser
-              storage is used for DAT file caching (including your custom
-              uploads), user preferences (theme selection), and smart cache
-              management with transparent status reporting. Theme preferences
-              are stored locally on your device only and are never transmitted
-              to any server. All cache data includes automatic expiry and
-              version control for optimal performance.
+              This site does not use analytics, tracking cookies, or any
+              monitoring tools. There are no third-party scripts that collect
+              data about how you use the site. The only browser storage used
+              is for DAT file caching, your theme preference, and validation
+              settings. All stored data stays on your device and is never
+              sent anywhere.
             </AlertDescription>
           </Alert>
 
           <Alert className="border-purple-500/20 bg-purple-500/5">
-            <AlertTitle className="text-purple-600">Open Source</AlertTitle>
-            <AlertDescription className="inline-block">
-              This project is open source and based on the proven <a
-                href="https://github.com/RP2/auto-rom-validator"
+            <AlertTitle className="text-purple-600"
+              >Open source and auditable</AlertTitle
+            >
+            <AlertDescription>
+              This project is open source. You can read every line of code to
+              verify these claims. The site is hosted on Cloudflare Pages.
+            </AlertDescription>
+            <AlertDescription className="mt-2">
+              <a
+                href="https://www.cloudflare.com/privacypolicy/"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="font-medium italic hover:underline"
-                >auto-rom-validator Python script</a
-              >. You can review the code, run it locally, contribute
-              improvements, or report bugs on <a
+                class="text-primary font-medium hover:underline"
+                >Cloudflare privacy policy</a
+              >
+            </AlertDescription>
+            <AlertDescription className="mt-2">
+              <a
                 href="https://github.com/RP2/rom-validate-web"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="font-medium italic hover:underline">GitHub</a
-              >. Contributions and feedback are welcome!
+                class="text-primary font-medium hover:underline"
+                >View the source on GitHub</a
+              >
             </AlertDescription>
           </Alert>
         </CardContent>
@@ -323,10 +285,8 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
         <CardContent>
           <Alert className="border-yellow-500/20 bg-yellow-500/5">
             <AlertDescription>
-              <strong>Important:</strong> This tool is intended solely for legitimate
-              game preservation and backups of games you own. It is not designed
-              to facilitate piracy. Users are responsible for complying with applicable
-              copyright laws in their jurisdiction.
+              The app is for game preservation and backups of games you own. It
+              is not for piracy. You must follow copyright laws in your area.
             </AlertDescription>
           </Alert>
         </CardContent>
@@ -362,7 +322,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
             </div>
 
             <div class="space-y-2">
-              <h4 class="font-semibold">Preservation Communities</h4>
+              <h4 class="font-semibold">Source Code</h4>
               <div class="space-y-1">
                 <a
                   href="https://github.com/RP2/auto-rom-validator"
@@ -373,12 +333,12 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert.tsx";
                   Original Python Project
                 </a>
                 <a
-                  href="https://emulation.gametechwiki.com/"
+                  href="https://github.com/RP2/rom-validate-web"
                   target="_blank"
                   rel="noopener noreferrer"
                   class="text-primary block text-sm hover:underline"
                 >
-                  Emulation Wiki
+                  Web ROM Validator on GitHub
                 </a>
               </div>
             </div>

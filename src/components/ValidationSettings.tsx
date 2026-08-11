@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import {
   Card,
   CardContent,
@@ -106,12 +105,9 @@ export default function ValidationSettings() {
               </div>
 
               {settings.skipLargeFiles && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.3 }}
+                <div
                   className="flex items-center gap-2"
+                  style={{ animation: "fade-slide-in 0.3s ease" }}
                 >
                   <Input
                     type="number"
@@ -126,7 +122,7 @@ export default function ValidationSettings() {
                     max="10240"
                   />
                   <span className="text-muted-foreground text-sm">MB</span>
-                </motion.div>
+                </div>
               )}
             </div>
 

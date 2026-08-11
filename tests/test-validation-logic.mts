@@ -28,7 +28,9 @@ function assertEqual(actual: unknown, expected: unknown, name: string) {
     console.log(`  ✅ ${name}`);
     passed++;
   } else {
-    console.error(`  ❌ ${name}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+    console.error(
+      `  ❌ ${name}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+    );
     failed++;
   }
 }
@@ -38,7 +40,10 @@ console.log("\n📋 Extension Mapping Tests");
 // ============================================================
 
 assert(EXTENSION_MAP[".gba"] === "Game Boy Advance", ".gba maps to GBA");
-assert(EXTENSION_MAP[".nds"].length === 3, ".nds maps to 3 platforms (DS, DS Download Play, DSi)");
+assert(
+  EXTENSION_MAP[".nds"].length === 3,
+  ".nds maps to 3 platforms (DS, DS Download Play, DSi)",
+);
 assert(EXTENSION_MAP[".iso"].length === 4, ".iso maps to 4 platforms");
 assert(EXTENSION_MAP[".bin"].length === 3, ".bin maps to 3 platforms");
 assert(EXTENSION_MAP[".smc"] === "Super Nintendo", ".smc maps to SNES");
@@ -51,31 +56,31 @@ console.log("\n📋 Platform Detection Tests");
 assertEqual(
   getPlatformsForFile("Pokemon Ruby.gba"),
   ["Game Boy Advance"],
-  "GBA file detected"
+  "GBA file detected",
 );
 
 assertEqual(
   getPlatformsForFile("Super Mario 64.n64"),
   ["Nintendo 64"],
-  "N64 file detected"
+  "N64 file detected",
 );
 
 assertEqual(
   getPlatformsForFile("Mario Kart DS.nds").length,
   3,
-  "NDS file maps to multiple platforms"
+  "NDS file maps to multiple platforms",
 );
 
 assertEqual(
   getPlatformsForFile("Final Fantasy VII.iso").length,
   4,
-  "ISO file maps to multiple platforms"
+  "ISO file maps to multiple platforms",
 );
 
 assertEqual(
   getPlatformsForFile("unknown.xyz"),
   [],
-  "Unknown extension returns empty array"
+  "Unknown extension returns empty array",
 );
 
 // ============================================================
@@ -92,10 +97,17 @@ console.log("\n📋 Platform Configuration Tests");
 // ============================================================
 
 const totalPlatforms = Object.keys(PLATFORMS).length;
-assert(totalPlatforms >= 15, `At least 15 platforms supported (got ${totalPlatforms})`);
+assert(
+  totalPlatforms >= 15,
+  `At least 15 platforms supported (got ${totalPlatforms})`,
+);
 
-const noIntroCount = Object.values(PLATFORMS).filter(p => p.includes("no-intro")).length;
-const redumpCount = Object.values(PLATFORMS).filter(p => p.includes("redump")).length;
+const noIntroCount = Object.values(PLATFORMS).filter((p) =>
+  p.includes("no-intro"),
+).length;
+const redumpCount = Object.values(PLATFORMS).filter((p) =>
+  p.includes("redump"),
+).length;
 assert(noIntroCount > 0, `No-Intro sources exist (${noIntroCount})`);
 assert(redumpCount > 0, `Redump sources exist (${redumpCount})`);
 
