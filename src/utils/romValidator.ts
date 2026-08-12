@@ -106,6 +106,24 @@ export interface ValidationResult {
   datSource?: string; // Which DAT database matched (e.g., "No-Intro", "Redump")
 }
 
+type ProgressCallback = (
+  current: number,
+  total: number,
+  currentFile: string,
+  stage: "hashing" | "loading-dats" | "validating",
+  fileProgress?: number,
+) => void;
+
+function isOutOfMemoryError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "OutOfMemoryError" ||
+      error.message.includes("allocation") ||
+      error.message.includes("memory") ||
+      error.message.includes("out of memory"))
+  );
+}
+
 // Calculate file hashes client-side with progress tracking using Web Worker
 // Uses streaming with 1MB chunks to handle files of any size without OOM
 // Can use parallel worker pool for batch processing multiple files concurrently
@@ -729,13 +747,7 @@ async function determinePlatforms(
 // Process multiple files
 export async function validateROMs(
   files: File[],
-  onProgress?: (
-    current: number,
-    total: number,
-    currentFile: string,
-    stage: "hashing" | "loading-dats" | "validating",
-    fileProgress?: number,
-  ) => void,
+  onProgress?: ProgressCallback,
   forcePlatform?: string,
   parallelWorkers?: number,
   abortSignal?: AbortSignal,
@@ -845,13 +857,7 @@ export async function validateROMs(
 async function processFilesSequential(
   validFiles: File[],
   results: ValidationResult[],
-  onProgress?: (
-    current: number,
-    total: number,
-    currentFile: string,
-    stage: "hashing" | "loading-dats" | "validating",
-    fileProgress?: number,
-  ) => void,
+  onProgress?: ProgressCallback,
   forcePlatform?: string,
   datCache?: Map<string, DATEntry[]>,
   datSourceCache?: Map<string, string | undefined>,
@@ -890,12 +896,7 @@ async function processFilesSequential(
     } catch (error) {
       // Per-file error: record a failure result and continue with remaining files
       console.error(`Error processing ${file.name}:`, error);
-      const isOutOfMemory =
-        error instanceof Error &&
-        (error.name === "OutOfMemoryError" ||
-          error.message.includes("allocation") ||
-          error.message.includes("memory") ||
-          error.message.includes("out of memory"));
+      const isOutOfMemory = isOutOfMemoryError(error);
 
       results.push({
         filename: file.name,
@@ -916,13 +917,7 @@ async function processFilesSequential(
 async function processFilesParallel(
   validFiles: File[],
   results: ValidationResult[],
-  onProgress?: (
-    current: number,
-    total: number,
-    currentFile: string,
-    stage: "hashing" | "loading-dats" | "validating",
-    fileProgress?: number,
-  ) => void,
+  onProgress?: ProgressCallback,
   forcePlatform?: string,
   workerCount: number = 4,
   datCache?: Map<string, DATEntry[]>,
@@ -1003,12 +998,7 @@ async function processFilesParallel(
             } catch (error) {
               // Per-file error: record a failure result and continue
               console.error(`Error processing ${file.name}:`, error);
-              const isOutOfMemory =
-                error instanceof Error &&
-                (error.name === "OutOfMemoryError" ||
-                  error.message.includes("allocation") ||
-                  error.message.includes("memory") ||
-                  error.message.includes("out of memory"));
+              const isOutOfMemory = isOutOfMemoryError(error);
 
               return {
                 filename: file.name,
@@ -1073,12 +1063,7 @@ async function processFilesParallel(
       results.push(result);
     } catch (error) {
       console.error(`Error processing ${file.name}:`, error);
-      const isOutOfMemory =
-        error instanceof Error &&
-        (error.name === "OutOfMemoryError" ||
-          error.message.includes("allocation") ||
-          error.message.includes("memory") ||
-          error.message.includes("out of memory"));
+      const isOutOfMemory = isOutOfMemoryError(error);
 
       results.push({
         filename: file.name,
@@ -1100,13 +1085,7 @@ async function processFilesParallel(
 async function processSingleFileValidation(
   file: File,
   hashes: { md5: string; sha1: string; crc32: string },
-  onProgress?: (
-    current: number,
-    total: number,
-    currentFile: string,
-    stage: "hashing" | "loading-dats" | "validating",
-    fileProgress?: number,
-  ) => void,
+  onProgress?: ProgressCallback,
   currentIndex: number = 0,
   totalFiles: number = 1,
   forcePlatform?: string,
