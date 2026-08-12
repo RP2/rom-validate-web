@@ -3,77 +3,20 @@
 
 import { parseDAT } from "./romValidator";
 import type { DATEntry } from "./romValidator";
+import {
+  PLATFORMS,
+  EXTENSION_MAP,
+  ENCRYPTION_PRONE_EXTENSIONS,
+  BUNDLED_DATS,
+} from "./platforms";
+
+// Re-export for consumers that import from datLoader
+export { PLATFORMS, EXTENSION_MAP };
 
 // Configuration matching the CLI version
 // Base URL for Libretro database
 const LIBRETRO_BASE_URL =
   "https://raw.githubusercontent.com/libretro/libretro-database/master";
-
-// Platform configurations with both No-Intro and Redump sources
-export const PLATFORMS = {
-  "Game Boy Advance": "metadat/no-intro/Nintendo - Game Boy Advance.dat",
-  "Game Boy": "metadat/no-intro/Nintendo - Game Boy.dat",
-  "Game Boy Color": "metadat/no-intro/Nintendo - Game Boy Color.dat",
-  "Nintendo DS": "metadat/no-intro/Nintendo - Nintendo DS.dat",
-  "Nintendo DS Download Play":
-    "metadat/no-intro/Nintendo - Nintendo DS (Download Play).dat",
-  "Nintendo DSi": "metadat/no-intro/Nintendo - Nintendo DSi.dat",
-  "Nintendo 3DS": "metadat/no-intro/Nintendo - Nintendo 3DS.dat",
-  "Nintendo 64": "metadat/no-intro/Nintendo - Nintendo 64.dat",
-  "Super Nintendo":
-    "metadat/no-intro/Nintendo - Super Nintendo Entertainment System.dat",
-  "Nintendo Entertainment System":
-    "metadat/no-intro/Nintendo - Nintendo Entertainment System.dat",
-  PlayStation: "metadat/redump/Sony - PlayStation.dat",
-  "PlayStation 2": "metadat/redump/Sony - PlayStation 2.dat",
-  PSP: "metadat/no-intro/Sony - PlayStation Portable.dat",
-  GameCube: "metadat/redump/Nintendo - GameCube.dat",
-  Wii: "metadat/redump/Nintendo - Wii.dat",
-  "Sega Genesis": "metadat/no-intro/Sega - Mega Drive - Genesis.dat",
-  Dreamcast: "metadat/redump/Sega - Dreamcast.dat",
-};
-
-// Extension to platform mapping
-export const EXTENSION_MAP = {
-  ".gba": "Game Boy Advance",
-  ".gb": "Game Boy",
-  ".gbc": "Game Boy Color",
-  // DS-based ROMs map to multiple DATs
-  ".nds": ["Nintendo DS", "Nintendo DS Download Play", "Nintendo DSi"],
-  ".3ds": "Nintendo 3DS",
-  ".n64": "Nintendo 64",
-  ".z64": "Nintendo 64",
-  ".smc": "Super Nintendo",
-  ".sfc": "Super Nintendo",
-  ".nes": "Nintendo Entertainment System",
-  // Disc images: PS2, Wii, PSP, GameCube (ordered by typical size ranges)
-  ".iso": ["PlayStation 2", "Wii", "PSP", "GameCube"],
-  ".cso": "PSP",
-  ".pbp": "PSP",
-  // GameCube image formats
-  ".gcm": "GameCube",
-  ".ciso": "GameCube",
-  // Wii image format
-  ".wbfs": "Wii",
-  // CD-based: PS1, Dreamcast first (more common for CD format), then PS2 fallback
-  ".bin": ["PlayStation", "Dreamcast", "PlayStation 2"],
-  // Sega Genesis/Mega Drive formats
-  ".md": "Sega Genesis",
-  ".gen": "Sega Genesis",
-  ".smd": "Sega Genesis",
-  // Dreamcast formats
-  ".cdi": "Dreamcast",
-  ".gdi": "Dreamcast",
-};
-
-// Extensions that are prone to encryption
-export const ENCRYPTION_PRONE_EXTENSIONS = new Set([".nds", ".3ds"]);
-
-// Pre-bundled DAT files for platforms that require special access (encrypted versions)
-export const BUNDLED_DATS = {
-  "Nintendo DS Encrypted (Bundled)":
-    "/dats/Nintendo - Nintendo DS (Encrypted).dat",
-};
 
 // Cache for parsed DAT entries with persistent storage
 const datCache = new Map<string, DATEntry[]>();

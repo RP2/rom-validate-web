@@ -11,6 +11,7 @@ import {
   loadAllBundledDATs,
   loadPlatformDAT,
 } from "./datLoader";
+import { PLATFORMS, EXTENSION_MAP } from "./platforms";
 
 // Web Worker singleton for hash calculation
 let hashWorker: Worker | null = null;
@@ -509,43 +510,19 @@ function detectPlatformFromName(filename: string, size: number): string {
   const name = filename.toLowerCase();
   const ext = name.substring(name.lastIndexOf("."));
 
-  // Use the centralized extension mapping from datLoader
-  // Import dynamically to avoid circular dependencies
-  const extensionMap = {
-    ".gba": "Game Boy Advance",
-    ".gb": "Game Boy",
-    ".gbc": "Game Boy Color",
-    ".nds": ["Nintendo DS", "Nintendo DS Download Play", "Nintendo DSi"],
-    ".3ds": "Nintendo 3DS",
-    ".n64": "Nintendo 64",
-    ".z64": "Nintendo 64",
-    ".smc": "Super Nintendo",
-    ".sfc": "Super Nintendo",
-    ".nes": "Nintendo Entertainment System",
-    ".cso": "PSP",
-    ".pbp": "PSP",
-    ".gcm": "GameCube",
-    ".ciso": "GameCube",
-    ".wbfs": "Wii",
-    ".md": "Sega Genesis",
-    ".gen": "Sega Genesis",
-    ".smd": "Sega Genesis",
-    ".cdi": "Dreamcast",
-    ".gdi": "Dreamcast",
-  };
-
   // Direct extension mapping first
-  const mappedPlatform = extensionMap[ext as keyof typeof extensionMap];
+  const mappedPlatform = EXTENSION_MAP[ext as keyof typeof EXTENSION_MAP];
   if (mappedPlatform) {
     // If it's an array (multi-platform), use size-based detection to pick the best one
     if (Array.isArray(mappedPlatform)) {
-      // For DS family, prefer based on typical file sizes and naming
+      // .nds: pick specific DS variant by filename
       if (ext === ".nds") {
         if (name.includes("dsi")) return "Nintendo DSi";
         if (name.includes("download") || name.includes("demo"))
           return "Nintendo DS Download Play";
-        return "Nintendo DS"; // Default to regular DS
+        return "Nintendo DS";
       }
+      // .iso/.bin arrays: fall through to size-based detection below
     } else {
       return mappedPlatform;
     }
@@ -649,31 +626,6 @@ function detectRegion(filename: string): string | undefined {
 
 // Helper function to determine DAT source from platform
 function getDATSource(platform: string): string | undefined {
-  // Import the PLATFORMS configuration to determine the source
-  // This is a synchronous operation since PLATFORMS is just a constant object
-  const PLATFORMS: Record<string, string> = {
-    "Game Boy Advance": "metadat/no-intro/Nintendo - Game Boy Advance.dat",
-    "Game Boy": "metadat/no-intro/Nintendo - Game Boy.dat",
-    "Game Boy Color": "metadat/no-intro/Nintendo - Game Boy Color.dat",
-    "Nintendo DS": "metadat/no-intro/Nintendo - Nintendo DS.dat",
-    "Nintendo DS Download Play":
-      "metadat/no-intro/Nintendo - Nintendo DS (Download Play).dat",
-    "Nintendo DSi": "metadat/no-intro/Nintendo - Nintendo DSi.dat",
-    "Nintendo 3DS": "metadat/no-intro/Nintendo - Nintendo 3DS.dat",
-    "Nintendo 64": "metadat/no-intro/Nintendo - Nintendo 64.dat",
-    "Super Nintendo":
-      "metadat/no-intro/Nintendo - Super Nintendo Entertainment System.dat",
-    "Nintendo Entertainment System":
-      "metadat/no-intro/Nintendo - Nintendo Entertainment System.dat",
-    PlayStation: "metadat/redump/Sony - PlayStation.dat",
-    "PlayStation 2": "metadat/redump/Sony - PlayStation 2.dat",
-    PSP: "metadat/no-intro/Sony - PlayStation Portable.dat",
-    GameCube: "metadat/redump/Nintendo - GameCube.dat",
-    Wii: "metadat/redump/Nintendo - Wii.dat",
-    "Sega Genesis": "metadat/no-intro/Sega - Mega Drive - Genesis.dat",
-    Dreamcast: "metadat/redump/Sega - Dreamcast.dat",
-  };
-
   const platformPath = PLATFORMS[platform];
   if (!platformPath) return undefined;
 
