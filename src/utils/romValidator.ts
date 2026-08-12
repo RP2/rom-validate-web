@@ -246,7 +246,7 @@ function parseClrMameProDAT(
   let gameCount = 0;
   let inClrMameProHeader = false;
 
-  function pushEntry(gameName: string, rom: { name?: string; size?: number; md5?: string; sha1?: string; crc32?: string }) {
+  function pushEntry(gameName: string | undefined, rom: ClrRom) {
     if (!rom.name || !gameName) return;
     const platform = knownPlatform || (() => {
       const dp = detectPlatformFromName(gameName, rom.size || 0);
