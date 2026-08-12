@@ -55,7 +55,7 @@ function isGameCubeDisc(data: Uint8Array): boolean {
   const magic =
     (data[0x1c] << 24) | (data[0x1d] << 16) | (data[0x1e] << 8) | data[0x1f];
 
-  return magic === 0xc2339f3d;
+  return (magic >>> 0) === 0xc2339f3d;
 }
 
 /**

@@ -14,7 +14,9 @@
     "test:worker-pool": "tsx tests/test-worker-pool.mts",
     "test:dat-loader": "tsx tests/test-dat-loader.mts",
     "test:validate-rom": "tsx tests/test-validate-rom.mts",
-    "test": "npm run test:config && npm run test:validation && npm run test:validate-rom && npm run test:worker-pool && npm run test:dat-loader"
+    "test:parser": "tsx tests/test-parser.mts",
+    "test:disc-detection": "tsx tests/test-disc-detection.mts",
+    "test": "npm run test:config && npm run test:validation && npm run test:validate-rom && npm run test:parser && npm run test:disc-detection && npm run test:worker-pool && npm run test:dat-loader"
   },
   "dependencies": {
     "@astrojs/react": "^6.0.2",
