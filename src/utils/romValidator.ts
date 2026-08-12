@@ -245,6 +245,24 @@ function parseClrMameProDAT(
   let gameCount = 0;
   let inClrMameProHeader = false;
 
+  function pushEntry(gameName: string, rom: { name?: string; size?: number; md5?: string; sha1?: string; crc32?: string }) {
+    if (!rom.name || !gameName) return;
+    const platform = knownPlatform || (() => {
+      const dp = detectPlatformFromName(gameName, rom.size || 0);
+      return dp !== "unknown" ? dp : undefined;
+    })();
+    const region = detectRegion(gameName);
+    entries.push({
+      name: gameName,
+      size: rom.size || 0,
+      md5: rom.md5,
+      sha1: rom.sha1,
+      crc32: rom.crc32,
+      platform,
+      region,
+    });
+  }
+
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
     const line = lines[lineIndex];
     const trimmed = line.trim();
@@ -343,63 +361,12 @@ function parseClrMameProDAT(
       // Check if this is a single-line ROM entry (ends with ` )`)
       if (trimmed.endsWith(" )")) {
         inRom = false;
-
-        if (currentRom.name && currentGame.name) {
-          const platform =
-            knownPlatform ||
-            (() => {
-              const detectedPlatform = detectPlatformFromName(
-                currentGame.name,
-                currentRom.size || 0,
-              );
-              return detectedPlatform !== "unknown"
-                ? detectedPlatform
-                : undefined;
-            })();
-          const region = detectRegion(currentGame.name);
-
-          entries.push({
-            name: currentGame.name,
-            size: currentRom.size || 0,
-            md5: currentRom.md5,
-            sha1: currentRom.sha1,
-            crc32: currentRom.crc32,
-            platform,
-            region,
-          });
-        }
-
+        pushEntry(currentGame.name, currentRom);
         currentRom = {};
       }
     } else if (trimmed === ")" && inRom) {
-      // End of rom block
       inRom = false;
-
-      if (currentRom.name && currentGame.name) {
-        const platform =
-          knownPlatform ||
-          (() => {
-            const detectedPlatform = detectPlatformFromName(
-              currentGame.name,
-              currentRom.size || 0,
-            );
-            return detectedPlatform !== "unknown"
-              ? detectedPlatform
-              : undefined;
-          })();
-        const region = detectRegion(currentGame.name);
-
-        entries.push({
-          name: currentGame.name,
-          size: currentRom.size || 0,
-          md5: currentRom.md5,
-          sha1: currentRom.sha1,
-          crc32: currentRom.crc32,
-          platform,
-          region,
-        });
-      }
-
+      pushEntry(currentGame.name, currentRom);
       currentRom = {};
     } else if (inRom && trimmed) {
       if (trimmed.startsWith("name ")) {
