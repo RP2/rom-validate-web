@@ -72,19 +72,6 @@ function getHashWorker(): Worker {
   return hashWorker;
 }
 
-// Simple MD5 implementation as fallback when Web Crypto API
-function simpleMD5(data: Uint8Array): string {
-  // This is a simplified version - in production you might want to use a library like crypto-js
-  // For now, we'll return a hash based on the data content
-  let hash = 0;
-  for (let i = 0; i < Math.min(data.length, 1024); i++) {
-    hash = (hash * 31 + data[i]) % 0xffffffff;
-  }
-
-  // Convert to hex string (not a real MD5, but deterministic)
-  return hash.toString(16).padStart(8, "0").repeat(4); // Make it 32 chars like MD5
-}
-
 export interface DATEntry {
   name: string;
   size: number;
@@ -117,26 +104,6 @@ export interface ValidationResult {
   issues?: string[];
   file?: File; // Store original file for download functionality
   datSource?: string; // Which DAT database matched (e.g., "No-Intro", "Redump")
-}
-
-// CRC32 table (built once at module level)
-const CRC32_TABLE = new Uint32Array(256);
-for (let i = 0; i < 256; i++) {
-  let c = i;
-  for (let j = 0; j < 8; j++) {
-    c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-  }
-  CRC32_TABLE[i] = c;
-}
-
-// CRC32 implementation for client-side hash calculation
-function crc32(data: Uint8Array): string {
-  let crc = 0xffffffff;
-  for (let i = 0; i < data.length; i++) {
-    crc = CRC32_TABLE[(crc ^ data[i]) & 0xff] ^ (crc >>> 8);
-  }
-
-  return ((crc ^ 0xffffffff) >>> 0).toString(16).toUpperCase().padStart(8, "0");
 }
 
 // Calculate file hashes client-side with progress tracking using Web Worker
@@ -184,60 +151,6 @@ async function calculateFileHashesParallel(
   } catch (error) {
     throw error instanceof Error ? error : new Error(String(error));
   }
-}
-
-// Legacy synchronous hash calculation (kept for compatibility/fallback)
-// Note: This loads the entire file into memory and should not be used for large files
-async function calculateFileHashesLegacy(
-  file: File,
-  onProgress?: (progress: number) => void,
-): Promise<{ md5: string; sha1: string; crc32: string }> {
-  const buffer = await file.arrayBuffer();
-  const data = new Uint8Array(buffer);
-
-  let md5 = "";
-  let sha1 = "";
-
-  onProgress?.(10); // Starting hash calculation
-
-  try {
-    // Try to calculate SHA-1 (widely supported)
-    const sha1Hash = await crypto.subtle.digest("SHA-1", buffer);
-    const sha1View = new Uint8Array(sha1Hash);
-    let sha1Hex = "";
-    for (let i = 0; i < sha1View.length; i++) {
-      sha1Hex += sha1View[i].toString(16).padStart(2, "0");
-    }
-    sha1 = sha1Hex;
-    onProgress?.(40); // SHA-1 complete
-  } catch (error) {
-    console.warn("SHA-1 calculation failed:", error);
-    sha1 = "unavailable";
-    onProgress?.(40);
-  }
-
-  try {
-    // Try to calculate MD5 (may not be available in all browsers)
-    const md5Hash = await crypto.subtle.digest("MD5", buffer);
-    const md5View = new Uint8Array(md5Hash);
-    let md5Hex = "";
-    for (let i = 0; i < md5View.length; i++) {
-      md5Hex += md5View[i].toString(16).padStart(2, "0");
-    }
-    md5 = md5Hex;
-    onProgress?.(70); // MD5 complete
-  } catch (error) {
-    console.warn("MD5 not supported in this browser, using fallback:", error);
-    // Fallback: use a simplified hash or mark as unavailable
-    md5 = simpleMD5(data);
-    onProgress?.(70);
-  }
-
-  // Calculate CRC32 (always available since it's our implementation)
-  const crc32Hash = crc32(data);
-  onProgress?.(90); // CRC32 complete
-
-  return { md5, sha1, crc32: crc32Hash };
 }
 
 // Parse DAT files (supports both XML and ClrMamePro formats)
