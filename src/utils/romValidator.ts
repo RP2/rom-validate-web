@@ -12,6 +12,7 @@ import {
   loadPlatformDAT,
 } from "./datLoader";
 import { PLATFORMS, EXTENSION_MAP } from "./platforms";
+import { detectDiscPlatform, getPlatformPriority } from "./discDetector";
 
 // Web Worker singleton for hash calculation
 let hashWorker: Worker | null = null;
@@ -83,9 +84,6 @@ export interface DATEntry {
   description?: string;
   datSource?: string; // e.g., "No-Intro", "Redump"
 }
-
-import { detectDiscPlatform, getPlatformPriority } from "./discDetector";
-import type { DiscPlatform } from "./discDetector";
 
 export interface ValidationResult {
   filename: string;
@@ -238,10 +236,13 @@ function parseClrMameProDAT(
   const entries: DATEntry[] = [];
   const lines = datContent.split("\n");
 
-  let currentGame: any = {};
+  interface ClrGame { name?: string; description?: string; region?: string }
+  interface ClrRom { name?: string; size?: number; md5?: string; sha1?: string; crc32?: string }
+
+  let currentGame: ClrGame = {};
   let inGame = false;
   let inRom = false;
-  let currentRom: any = {};
+  let currentRom: ClrRom = {};
   let gameCount = 0;
   let inClrMameProHeader = false;
 

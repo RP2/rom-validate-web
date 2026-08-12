@@ -1,5 +1,5 @@
 // Shared platform constants used by both datLoader and romValidator.
-// Extracted here to avoid circular imports between those two modules.
+// Extracted here so both modules can import without importing each other.
 
 export const PLATFORMS: Record<string, string> = {
   "Game Boy Advance": "metadat/no-intro/Nintendo - Game Boy Advance.dat",
