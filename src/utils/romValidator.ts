@@ -1082,12 +1082,16 @@ async function processSingleFileValidation(
     return datSourceCache?.get(platform) ?? getDATSource(platform);
   };
 
+  const tryPlatform = async (platform: string): Promise<ValidationResult> => {
+    const entries = await getEntries(platform);
+    const source = getSource(platform);
+    return validateROM(file, hashes, entries, source);
+  };
+
   let result: ValidationResult;
 
   if (forcePlatform) {
-    const platformEntries = await getEntries(forcePlatform);
-    const datSource = getSource(forcePlatform);
-    result = validateROM(file, hashes, platformEntries, datSource);
+    result = await tryPlatform(forcePlatform);
   } else if (platforms.length > 0) {
     if (platforms.length > 1) {
       const mostLikelyPlatform = detectPlatformFromName(file.name, file.size);
@@ -1104,14 +1108,7 @@ async function processSingleFileValidation(
       } as ValidationResult;
 
       for (const platform of orderedPlatforms) {
-        const platformEntries = await getEntries(platform);
-        const datSource = getSource(platform);
-        const platformResult = validateROM(
-          file,
-          hashes,
-          platformEntries,
-          datSource,
-        );
+        const platformResult = await tryPlatform(platform);
 
         if (platformResult.status !== "unknown") {
           resultVal = platformResult;
@@ -1138,14 +1135,7 @@ async function processSingleFileValidation(
           );
 
           for (const platform of uncheckedPlatforms) {
-            const fallbackEntries = await getEntries(platform);
-            const datSource = getSource(platform);
-            const fallbackResult = validateROM(
-              file,
-              hashes,
-              fallbackEntries,
-              datSource,
-            );
+            const fallbackResult = await tryPlatform(platform);
 
             if (fallbackResult.status !== "unknown") {
               resultVal = fallbackResult;
@@ -1156,16 +1146,12 @@ async function processSingleFileValidation(
       }
 
       if (resultVal.status === "unknown") {
-        const fallbackEntries = await getEntries(orderedPlatforms[0]);
-        const datSource = getSource(orderedPlatforms[0]);
-        resultVal = validateROM(file, hashes, fallbackEntries, datSource);
+        resultVal = await tryPlatform(orderedPlatforms[0]);
       }
 
       result = resultVal;
     } else {
-      const platformEntries = await getEntries(platforms[0]);
-      const datSource = getSource(platforms[0]);
-      result = validateROM(file, hashes, platformEntries, datSource);
+      result = await tryPlatform(platforms[0]);
     }
   } else {
     // No platform detected — try all cached DATs first, then fall back to loading all
