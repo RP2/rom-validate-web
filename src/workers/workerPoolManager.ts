@@ -140,6 +140,9 @@ class WorkerPool {
     for (const worker of this.workers) {
       worker.terminate();
     }
+    for (const operation of this.pendingOperations.values()) {
+      operation.reject(new DOMException("Validation canceled", "AbortError"));
+    }
     this.workers = [];
     this.availableWorkers = [];
     this.pendingOperations.clear();

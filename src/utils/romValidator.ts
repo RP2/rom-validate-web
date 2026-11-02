@@ -27,6 +27,22 @@ const pendingOperations = new Map<
   }
 >();
 
+function cancelPendingHashes(): void {
+  const ids = [...pendingOperations.keys()];
+  for (const fileId of ids) {
+    const operation = pendingOperations.get(fileId);
+    if (operation) {
+      operation.reject(new DOMException("Validation canceled", "AbortError"));
+    }
+  }
+  pendingOperations.clear();
+  if (hashWorker) {
+    for (const fileId of ids) {
+      hashWorker.postMessage({ type: "CANCEL", fileId });
+    }
+  }
+}
+
 function getHashWorker(): Worker {
   if (!hashWorker) {
     // Create worker from the worker file
@@ -236,8 +252,18 @@ function parseClrMameProDAT(
   const entries: DATEntry[] = [];
   const lines = datContent.split("\n");
 
-  interface ClrGame { name?: string; description?: string; region?: string }
-  interface ClrRom { name?: string; size?: number; md5?: string; sha1?: string; crc32?: string }
+  interface ClrGame {
+    name?: string;
+    description?: string;
+    region?: string;
+  }
+  interface ClrRom {
+    name?: string;
+    size?: number;
+    md5?: string;
+    sha1?: string;
+    crc32?: string;
+  }
 
   let currentGame: ClrGame = {};
   let inGame = false;
@@ -248,10 +274,12 @@ function parseClrMameProDAT(
 
   function pushEntry(gameName: string | undefined, rom: ClrRom) {
     if (!rom.name || !gameName) return;
-    const platform = knownPlatform || (() => {
-      const dp = detectPlatformFromName(gameName, rom.size || 0);
-      return dp !== "unknown" ? dp : undefined;
-    })();
+    const platform =
+      knownPlatform ||
+      (() => {
+        const dp = detectPlatformFromName(gameName, rom.size || 0);
+        return dp !== "unknown" ? dp : undefined;
+      })();
     const region = detectRegion(gameName);
     entries.push({
       name: gameName,
@@ -653,8 +681,11 @@ export function validateROM(
   return {
     filename: file.name,
     originalName: file.name,
-    status: "unknown",
-    platform: platform !== "unknown" ? platform : undefined,
+    status: sizeMatches.length > 0 ? "invalid" : "unknown",
+    // Prefer the platform whose DAT produced the size match.
+    platform:
+      sizeMatches[0]?.platform ??
+      (platform !== "unknown" ? platform : undefined),
     region: detectRegion(file.name),
     size: file.size,
     hashes,
@@ -740,6 +771,12 @@ export async function validateROMs(
     });
   }
 
+  const onAbort = () => {
+    cancelPendingHashes();
+    void terminatePool();
+  };
+  abortSignal?.addEventListener("abort", onAbort);
+
   try {
     // Check for cancellation before starting
     if (abortSignal?.aborted) {
@@ -812,7 +849,13 @@ export async function validateROMs(
         abortSignal,
       );
     }
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return results;
+    }
+    throw error;
   } finally {
+    abortSignal?.removeEventListener("abort", onAbort);
     // Clean up worker pool
     if (useParallel) {
       await terminatePool();
@@ -862,6 +905,7 @@ async function processFilesSequential(
       );
       results.push(result);
     } catch (error) {
+      if (abortSignal?.aborted) throw error;
       // Per-file error: record a failure result and continue with remaining files
       console.error(`Error processing ${file.name}:`, error);
       const isOutOfMemory = isOutOfMemoryError(error);
@@ -964,6 +1008,7 @@ async function processFilesParallel(
               );
               return result;
             } catch (error) {
+              if (abortSignal?.aborted) throw error;
               // Per-file error: record a failure result and continue
               console.error(`Error processing ${file.name}:`, error);
               const isOutOfMemory = isOutOfMemoryError(error);
@@ -1030,6 +1075,7 @@ async function processFilesParallel(
       );
       results.push(result);
     } catch (error) {
+      if (abortSignal?.aborted) throw error;
       console.error(`Error processing ${file.name}:`, error);
       const isOutOfMemory = isOutOfMemoryError(error);
 
@@ -1089,10 +1135,48 @@ async function processSingleFileValidation(
     return validateROM(file, hashes, entries, source);
   };
 
+  const triedPlatforms = new Set<string>();
+
+  const tryAndTrack = async (platform: string): Promise<ValidationResult> => {
+    triedPlatforms.add(platform);
+    return tryPlatform(platform);
+  };
+
+  // "invalid" means the size matched but hashes did not. It is weaker than a
+  // hash match, so keep trying other platforms and only fall back to it if no
+  // platform produces a valid or renamed result.
+  const isStrongMatch = (candidate: ValidationResult): boolean =>
+    candidate.status === "valid" || candidate.status === "renamed";
+
+  const preferResult = (
+    best: ValidationResult,
+    candidate: ValidationResult,
+  ): ValidationResult => {
+    if (isStrongMatch(candidate)) return candidate;
+    if (best.status === "unknown" && candidate.status === "invalid") {
+      return candidate;
+    }
+    return best;
+  };
+
   let result: ValidationResult;
 
   if (forcePlatform) {
-    result = await tryPlatform(forcePlatform);
+    result = await tryAndTrack(forcePlatform);
+    if (!isStrongMatch(result)) {
+      const fallbackPlatforms = [
+        ...new Set([
+          ...(await determinePlatforms(file)),
+          ...getPlatformsForFile(file.name),
+        ]),
+      ];
+      for (const platform of fallbackPlatforms) {
+        if (triedPlatforms.has(platform)) continue;
+        const candidate = await tryAndTrack(platform);
+        result = preferResult(result, candidate);
+        if (isStrongMatch(result)) break;
+      }
+    }
   } else if (platforms.length > 0) {
     if (platforms.length > 1) {
       const mostLikelyPlatform = detectPlatformFromName(file.name, file.size);
@@ -1107,52 +1191,45 @@ async function processSingleFileValidation(
       let resultVal: ValidationResult = {
         status: "unknown",
       } as ValidationResult;
+      let firstResult: ValidationResult | undefined;
 
       for (const platform of orderedPlatforms) {
-        const platformResult = await tryPlatform(platform);
+        const platformResult = await tryAndTrack(platform);
+        firstResult ??= platformResult;
+        resultVal = preferResult(resultVal, platformResult);
+        if (isStrongMatch(resultVal)) break;
+      }
 
-        if (platformResult.status !== "unknown") {
-          resultVal = platformResult;
-          break;
+      if (!isStrongMatch(resultVal)) {
+        const candidatePlatforms = getPlatformsForFile(file.name).filter(
+          (p) => !triedPlatforms.has(p),
+        );
+
+        for (const platform of candidatePlatforms) {
+          const fallbackResult = await tryAndTrack(platform);
+          resultVal = preferResult(resultVal, fallbackResult);
+          if (isStrongMatch(resultVal)) break;
         }
       }
 
-      if (resultVal.status === "unknown") {
-        const ext = file.name
-          .toLowerCase()
-          .substring(file.name.lastIndexOf("."));
-
-        let fallbackPlatforms: string[] = [];
-
-        if (ext === ".iso") {
-          fallbackPlatforms = ["PlayStation 2", "PSP", "GameCube"];
-        } else if (ext === ".bin") {
-          fallbackPlatforms = ["PlayStation", "Dreamcast", "PlayStation 2"];
-        }
-
-        if (fallbackPlatforms.length > 0) {
-          const uncheckedPlatforms = fallbackPlatforms.filter(
-            (p) => !orderedPlatforms.includes(p),
-          );
-
-          for (const platform of uncheckedPlatforms) {
-            const fallbackResult = await tryPlatform(platform);
-
-            if (fallbackResult.status !== "unknown") {
-              resultVal = fallbackResult;
-              break;
-            }
-          }
-        }
-      }
-
-      if (resultVal.status === "unknown") {
-        resultVal = await tryPlatform(orderedPlatforms[0]);
+      // Keep the platform context when every candidate missed.
+      if (resultVal.status === "unknown" && firstResult) {
+        resultVal = firstResult;
       }
 
       result = resultVal;
     } else {
-      result = await tryPlatform(platforms[0]);
+      result = await tryAndTrack(platforms[0]);
+      if (!isStrongMatch(result)) {
+        const candidatePlatforms = getPlatformsForFile(file.name).filter(
+          (p) => !triedPlatforms.has(p),
+        );
+        for (const platform of candidatePlatforms) {
+          const candidate = await tryAndTrack(platform);
+          result = preferResult(result, candidate);
+          if (isStrongMatch(result)) break;
+        }
+      }
     }
   } else {
     // No platform detected — try all cached DATs first, then fall back to loading all

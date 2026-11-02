@@ -116,7 +116,10 @@ export default function ValidationResults() {
       result.status === "renamed" && result.suggestedName && result.file,
   );
 
-  const unknownFiles = results.filter((result) => result.status === "unknown");
+  // "invalid" means size matched but hashes did not: still unverified.
+  const unknownFiles = results.filter(
+    (result) => result.status === "unknown" || result.status === "invalid",
+  );
 
   const [isZipping, setIsZipping] = useState(false);
 
@@ -218,7 +221,7 @@ export default function ValidationResults() {
       URL.revokeObjectURL(url);
 
       toast.success(
-        `Exported ${unknownFiles.length} unknown file${unknownFiles.length !== 1 ? "s" : ""} as JSON`,
+        `Exported ${unknownFiles.length} unverified file${unknownFiles.length !== 1 ? "s" : ""} as JSON`,
       );
     } catch (error) {
       console.error("Error exporting unknown list:", error);
@@ -319,7 +322,7 @@ export default function ValidationResults() {
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
@@ -343,6 +346,20 @@ export default function ValidationResults() {
                   {summary.valid}
                 </p>
                 <p className="text-muted-foreground text-xs">Valid</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <XCircle className="h-4 w-4 text-red-500" />
+              <div>
+                <p className="text-2xl font-bold text-red-600">
+                  {summary.invalid}
+                </p>
+                <p className="text-muted-foreground text-xs">Invalid</p>
               </div>
             </div>
           </CardContent>
@@ -402,6 +419,13 @@ export default function ValidationResults() {
               onClick={() => setSelectedStatus("valid")}
             >
               Valid
+            </Button>
+            <Button
+              variant={selectedStatus === "invalid" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedStatus("invalid")}
+            >
+              Invalid
             </Button>
             <Button
               variant={selectedStatus === "unknown" ? "default" : "outline"}
@@ -812,7 +836,7 @@ export default function ValidationResults() {
               {unknownFiles.length > 0 && (
                 <Button variant="outline" onClick={handleExportUnknownJSON}>
                   <FileText className="mr-2 h-4 w-4" />
-                  Export Unknown as JSON ({unknownFiles.length})
+                  Export Unknown/Invalid as JSON ({unknownFiles.length})
                 </Button>
               )}
             </div>

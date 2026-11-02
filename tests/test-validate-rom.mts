@@ -141,7 +141,7 @@ console.log("\n📋 Size-Only Match (No Hash Match)");
   const hashes = { md5: "nomatch", sha1: "nomatch", crc32: "nomatch" };
   const entries: DATEntry[] = [{ name: "test.iso", size: 1024, md5: "different" }];
   const result = validateROM(file, hashes, entries);
-  assertEqual(result.status, "unknown", "Size matches but hashes don't → unknown");
+  assertEqual(result.status, "invalid", "Size matches but hashes don't → invalid");
   const hasSizeIssue = result.issues?.some((i) => i.toLowerCase().includes("size matches")) ?? false;
   assert(hasSizeIssue, "Issues mention size matches");
 }

@@ -244,12 +244,25 @@ export default function FileUpload() {
   }, []);
 
   const addFiles = (newFiles: File[]) => {
+    // .cue files describe tracks only; validate the .bin files instead.
+    const usableFiles = newFiles.filter(
+      (f) => !f.name.toLowerCase().endsWith(".cue"),
+    );
+    const cueCount = newFiles.length - usableFiles.length;
+    if (cueCount > 0) {
+      toast.info(`${cueCount} .cue file(s) skipped`, {
+        description:
+          ".cue files only describe disc tracks. Add the matching .bin files instead.",
+      });
+    }
+    if (usableFiles.length === 0) return;
+
     // Skip duplicates: same name + same size = likely the same file
     setFiles((prev) => {
       const existing = new Set(
         prev.map((f) => `${f.file.name}|${f.file.size}`),
       );
-      const unique = newFiles.filter(
+      const unique = usableFiles.filter(
         (f) => !existing.has(`${f.name}|${f.size}`),
       );
 
@@ -260,9 +273,9 @@ export default function FileUpload() {
         return prev;
       }
 
-      if (unique.length < newFiles.length) {
+      if (unique.length < usableFiles.length) {
         toast.info(
-          `${newFiles.length - unique.length} duplicate file(s) skipped`,
+          `${usableFiles.length - unique.length} duplicate file(s) skipped`,
           {
             description:
               "Files with the same name and size are already in the queue.",
@@ -411,16 +424,27 @@ export default function FileUpload() {
                 const pIdx = fileIndexMap.get(f.file);
                 if (pIdx !== pendingIndex) return f; // Not this file — skip
 
-                // Mark as completed if progress is 100, otherwise processing
+                // Stage-scaled progress: hashing fills 0-90%, loading-dats is
+                // 90%, validating fills the remaining 10%.
+                let scaled: number;
+                if (stage === "hashing") {
+                  scaled = fileProgress * 0.9;
+                } else if (stage === "loading-dats") {
+                  scaled = 90;
+                } else {
+                  scaled = 90 + fileProgress * 0.1;
+                }
+
+                // A file is completed only when validating reaches 100%.
                 const newStatus =
-                  fileProgress >= 100
+                  stage === "validating" && fileProgress >= 100
                     ? ("completed" as const)
                     : ("processing" as const);
 
                 return {
                   ...f,
                   status: newStatus,
-                  progress: fileProgress,
+                  progress: Math.max(f.progress, scaled),
                   timeStarted: f.timeStarted || Date.now(),
                 };
               }),
@@ -432,12 +456,57 @@ export default function FileUpload() {
         abortController.signal,
       );
 
+      if (abortController.signal.aborted) {
+        // A file marked complete without a result (its batch was interrupted)
+        // must not keep showing as completed.
+        const finishedFiles = new Set(results.map((r) => r.file));
+        setFiles((prev) =>
+          prev.map((f) => {
+            if (
+              f.status === "completed" &&
+              fileIndexMap.has(f.file) &&
+              !finishedFiles.has(f.file)
+            ) {
+              return {
+                ...f,
+                status: "pending" as const,
+                progress: 0,
+                timeStarted: undefined,
+              };
+            }
+            return f;
+          }),
+        );
+
+        // Keep results for files that finished before the cancel.
+        if (results.length > 0) {
+          window.validationResults = [
+            ...(window.validationResults || []),
+            ...results,
+          ];
+          window.dispatchEvent(new CustomEvent("validationResultsUpdated"));
+          document
+            .getElementById("results-section")
+            ?.classList.remove("hidden");
+        }
+        // A newer run may already own the ref; only clear our own.
+        if (abortControllerRef.current === abortController) {
+          abortControllerRef.current = null;
+        }
+        return;
+      }
+
       // Mark all pending files as completed
-      abortControllerRef.current = null;
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
+
+      const resultFiles = new Set(results.map((r) => r.file));
 
       setFiles((prev) =>
         prev.map((f) => {
-          if (f.status === "pending" || f.status === "processing") {
+          if (f.status === "completed") return f;
+          if (resultFiles.has(f.file)) {
             return { ...f, status: "completed" as const, progress: 100 };
           }
           return f;
@@ -449,7 +518,7 @@ export default function FileUpload() {
         prev
           ? {
               ...prev,
-              processedFiles: pendingFiles.length,
+              processedFiles: results.length,
               currentStage: "completed",
               currentFile: undefined,
             }
