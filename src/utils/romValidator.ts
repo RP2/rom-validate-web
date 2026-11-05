@@ -565,6 +565,53 @@ function getDATSource(platform: string): string | undefined {
   return undefined;
 }
 
+interface HashIndex {
+  byHash: Map<string, number>;
+  bySize: Map<number, number[]>;
+}
+
+const hashIndexCache = new WeakMap<DATEntry[], HashIndex>();
+
+function getHashIndex(entries: DATEntry[]): HashIndex {
+  const cached = hashIndexCache.get(entries);
+  if (cached) return cached;
+
+  const byHash = new Map<string, number>();
+  const bySize = new Map<number, number[]>();
+
+  const addHash = (key: string, index: number) => {
+    // First entry in array order wins, matching the old linear find().
+    if (!byHash.has(key)) byHash.set(key, index);
+  };
+
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index];
+    if (entry.md5) addHash(`md5:${entry.md5.toLowerCase()}`, index);
+    if (entry.sha1) addHash(`sha1:${entry.sha1.toLowerCase()}`, index);
+    if (entry.crc32) addHash(`crc32:${entry.crc32.toLowerCase()}`, index);
+
+    const sameSize = bySize.get(entry.size);
+    if (sameSize) {
+      sameSize.push(index);
+    } else {
+      bySize.set(entry.size, [index]);
+    }
+  }
+
+  const built: HashIndex = { byHash, bySize };
+  hashIndexCache.set(entries, built);
+  return built;
+}
+
+function findHashMatch(
+  index: HashIndex,
+  kind: "md5" | "sha1" | "crc32",
+  value: string,
+): number | undefined {
+  if (!value || value === "unavailable") return undefined;
+  return index.byHash.get(`${kind}:${value.toLowerCase()}`);
+}
+
 // Validate ROM against DAT entries
 export function validateROM(
   file: File,
@@ -573,36 +620,15 @@ export function validateROM(
   datSource?: string,
 ): ValidationResult {
   // Look for exact hash matches (skip unavailable hashes)
-  const exactMatch = datEntries.find((entry) => {
-    // Try MD5 match if both are available (including fallback hash)
-    if (
-      entry.md5 &&
-      hashes.md5 !== "unavailable" &&
-      entry.md5.toLowerCase() === hashes.md5.toLowerCase()
-    ) {
-      return true;
-    }
+  const hashIndex = getHashIndex(datEntries);
+  const matches = [
+    findHashMatch(hashIndex, "md5", hashes.md5),
+    findHashMatch(hashIndex, "sha1", hashes.sha1),
+    findHashMatch(hashIndex, "crc32", hashes.crc32),
+  ].filter((entryIndex): entryIndex is number => entryIndex !== undefined);
 
-    // Try SHA-1 match if both are available
-    if (
-      entry.sha1 &&
-      hashes.sha1 !== "unavailable" &&
-      entry.sha1.toLowerCase() === hashes.sha1.toLowerCase()
-    ) {
-      return true;
-    }
-
-    // Try CRC32 match if both are available
-    if (
-      entry.crc32 &&
-      hashes.crc32 !== "unavailable" &&
-      entry.crc32.toLowerCase() === hashes.crc32.toLowerCase()
-    ) {
-      return true;
-    }
-
-    return false;
-  });
+  const exactMatch =
+    matches.length > 0 ? datEntries[Math.min(...matches)] : undefined;
 
   if (exactMatch) {
     // More intelligent filename comparison
@@ -664,7 +690,9 @@ export function validateROM(
   }
 
   // Check for size matches (might be different version/region)
-  const sizeMatches = datEntries.filter((entry) => entry.size === file.size);
+  const sizeMatches = (hashIndex.bySize.get(file.size) ?? []).map(
+    (entryIndex) => datEntries[entryIndex],
+  );
 
   const issues: string[] = [];
   if (sizeMatches.length > 0) {
@@ -701,6 +729,10 @@ export async function loadDATFiles(): Promise<DATEntry[]> {
   return await loadAllBundledDATs();
 }
 
+// Platform detection reads the first 64 KB for ISOs, so cache the result for
+// the same File across the preload and per-file phases.
+const platformCache = new WeakMap<File, string[]>();
+
 /**
  * Determine which platforms to check for a file
  * Uses disc header detection for ISO files when auto-detecting
@@ -715,6 +747,15 @@ async function determinePlatforms(
     return [forcePlatform];
   }
 
+  const cached = platformCache.get(file);
+  if (cached) return cached;
+
+  const platforms = await computePlatforms(file);
+  platformCache.set(file, platforms);
+  return platforms;
+}
+
+async function computePlatforms(file: File): Promise<string[]> {
   const ext = file.name.toLowerCase().substring(file.name.lastIndexOf("."));
 
   // For ISO files, use disc header detection

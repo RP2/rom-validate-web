@@ -259,8 +259,22 @@ export async function loadLibretroDAT(platform: string): Promise<DATEntry[]> {
   }
 }
 
+// Share one in-flight load per platform so parallel files do not refetch.
+const inFlightPlatformDATs = new Map<string, Promise<DATEntry[]>>();
+
 // Load DAT for a specific platform (loads both encrypted and decrypted for DS)
-export async function loadPlatformDAT(platform: string): Promise<DATEntry[]> {
+export function loadPlatformDAT(platform: string): Promise<DATEntry[]> {
+  const inFlight = inFlightPlatformDATs.get(platform);
+  if (inFlight) return inFlight;
+
+  const load = loadPlatformDATUncached(platform).finally(() => {
+    inFlightPlatformDATs.delete(platform);
+  });
+  inFlightPlatformDATs.set(platform, load);
+  return load;
+}
+
+async function loadPlatformDATUncached(platform: string): Promise<DATEntry[]> {
   const allEntries: DATEntry[] = [];
 
   // For Nintendo DS, load both encrypted (bundled) and decrypted (libretro)

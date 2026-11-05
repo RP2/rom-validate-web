@@ -177,6 +177,25 @@ console.log("\n📋 datSource Passthrough");
 }
 
 // ============================================================
+console.log("\n📋 First Entry Wins Across Hash Types");
+// ============================================================
+
+{
+  const file = new File([new Uint8Array(0)], "Order.gba", { type: "application/octet-stream" });
+  const hashes = { md5: "abc123", sha1: "def456", crc32: "789abc" };
+  const entries: DATEntry[] = [
+    { name: "First.gba", size: 0, sha1: "def456" },
+    { name: "Second.gba", size: 0, md5: "abc123" },
+  ];
+  const result = validateROM(file, hashes, entries);
+  assertEqual(
+    result.matchedEntry?.name,
+    "First.gba",
+    "earlier array entry wins over a later MD5 match",
+  );
+}
+
+// ============================================================
 console.log("\n📋 Empty DAT Entries");
 // ============================================================
 

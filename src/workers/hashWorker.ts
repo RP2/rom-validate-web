@@ -44,6 +44,7 @@ class Md5Calculator {
   private buffer: Uint8Array;
   private bufferLength: number;
   private totalLength: number;
+  private readonly x = new Uint32Array(16);
 
   constructor() {
     this.state = new Uint32Array([
@@ -87,7 +88,7 @@ class Md5Calculator {
 
   private processBlock(block: Uint8Array): void {
     const s = this.state;
-    const x = new Uint32Array(16);
+    const x = this.x;
 
     // Convert bytes to 32-bit words
     for (let i = 0; i < 16; i++) {
@@ -289,6 +290,7 @@ class Sha1Calculator {
   private buffer: Uint8Array;
   private bufferLength: number;
   private totalLength: number;
+  private readonly w = new Uint32Array(80);
 
   constructor() {
     this.state = new Uint32Array([
@@ -332,7 +334,7 @@ class Sha1Calculator {
 
   private processBlock(block: Uint8Array): void {
     const s = this.state;
-    const w = new Uint32Array(80);
+    const w = this.w;
 
     // Convert bytes to 32-bit words
     for (let i = 0; i < 16; i++) {
@@ -474,6 +476,7 @@ async function hashFile(file: File, fileId: string): Promise<void> {
     const crc32Calc = new Crc32Calculator();
 
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    let lastProgress = -1;
 
     for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
       // Check for cancellation
@@ -493,14 +496,17 @@ async function hashFile(file: File, fileId: string): Promise<void> {
       sha1Calc.update(data);
       crc32Calc.update(data);
 
-      // Send progress update
-      const progress = ((chunkIndex + 1) / totalChunks) * 100;
-      const progressMsg: ProgressMessage = {
-        type: "PROGRESS",
-        fileId,
-        progress,
-      };
-      self.postMessage(progressMsg);
+      // Send progress only when the integer percent changes.
+      const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+      if (progress !== lastProgress) {
+        lastProgress = progress;
+        const progressMsg: ProgressMessage = {
+          type: "PROGRESS",
+          fileId,
+          progress,
+        };
+        self.postMessage(progressMsg);
+      }
     }
 
     // Finalize all hashes
