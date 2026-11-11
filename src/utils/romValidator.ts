@@ -612,6 +612,61 @@ function findHashMatch(
   return index.byHash.get(`${kind}:${value.toLowerCase()}`);
 }
 
+interface CombinedEntries {
+  count: number;
+  entries: DATEntry[];
+  sources: string[];
+}
+
+const combinedEntriesCache = new WeakMap<
+  Map<string, DATEntry[]>,
+  CombinedEntries
+>();
+
+// Build the all-platform list once per validation run instead of once per file.
+function getCombinedEntries(
+  datCache: Map<string, DATEntry[]>,
+  datSourceCache?: Map<string, string | undefined>,
+): CombinedEntries {
+  const cached = combinedEntriesCache.get(datCache);
+  if (cached && cached.count === datCache.size) return cached;
+
+  const entries: DATEntry[] = [];
+  const sources: string[] = [];
+  for (const [platform, platformEntries] of datCache) {
+    entries.push(...platformEntries);
+    const source = datSourceCache?.get(platform);
+    if (source) sources.push(source);
+  }
+
+  const combined: CombinedEntries = {
+    count: datCache.size,
+    entries,
+    sources,
+  };
+  combinedEntriesCache.set(datCache, combined);
+  return combined;
+}
+
+const fallbackEntriesCache = new WeakMap<
+  Map<string, DATEntry[]>,
+  Promise<DATEntry[]>
+>();
+
+// Load every DAT at most once per validation run on the no-platform path.
+function getFallbackEntries(
+  datCache?: Map<string, DATEntry[]>,
+): Promise<DATEntry[]> {
+  if (!datCache) return loadDATFiles();
+
+  const cached = fallbackEntriesCache.get(datCache);
+  if (cached) return cached;
+
+  const loading = loadDATFiles();
+  fallbackEntriesCache.set(datCache, loading);
+  return loading;
+}
+
 // Validate ROM against DAT entries
 export function validateROM(
   file: File,
@@ -1274,21 +1329,16 @@ async function processSingleFileValidation(
     }
   } else {
     // No platform detected — try all cached DATs first, then fall back to loading all
-    const allEntries: DATEntry[] = [];
-    const allSources: string[] = [];
     if (datCache && datCache.size > 0) {
-      for (const [platform, entries] of datCache) {
-        allEntries.push(...entries);
-        const source = datSourceCache?.get(platform);
-        if (source) allSources.push(source);
-      }
+      const combined = getCombinedEntries(datCache, datSourceCache);
+      const datSource =
+        combined.sources.length > 0 ? combined.sources.join(", ") : undefined;
+      result = validateROM(file, hashes, combined.entries, datSource);
     } else {
       // Last resort: load all DATs
-      const allDatEntries = await loadDATFiles();
-      allEntries.push(...allDatEntries);
+      const allDatEntries = await getFallbackEntries(datCache);
+      result = validateROM(file, hashes, allDatEntries);
     }
-    const datSource = allSources.length > 0 ? allSources.join(", ") : undefined;
-    result = validateROM(file, hashes, allEntries, datSource);
   }
 
   onProgress?.(currentIndex + 1, totalFiles, file.name, "validating", 100);

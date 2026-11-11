@@ -79,7 +79,7 @@ export default function Header() {
   const handleClearCache = async () => {
     try {
       const { clearDATCache } = await import("@/utils/datLoader");
-      clearDATCache();
+      await clearDATCache();
 
       toast.success("DAT cache cleared successfully!");
 

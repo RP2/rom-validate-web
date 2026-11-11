@@ -51,8 +51,8 @@ export default function DATSettings() {
     }
   };
 
-  const handleClearCache = () => {
-    clearDATCache();
+  const handleClearCache = async () => {
+    await clearDATCache();
     loadCachedDATs();
     toast.success("DAT cache cleared successfully!");
   };

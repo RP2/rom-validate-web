@@ -21,8 +21,15 @@ const LIBRETRO_BASE_URL =
 // Cache for parsed DAT entries with persistent storage
 const datCache = new Map<string, DATEntry[]>();
 
-// Persistent cache using localStorage with expiration
+type DATSource = "bundled" | "libretro" | "custom";
+
+// Persistent cache using IndexedDB with expiration.
+// The record shape matches the old localStorage payload so existing caches
+// can be migrated in place.
 interface CachedDATData {
+  key: string;
+  platform: string;
+  source: DATSource;
   entries: DATEntry[];
   timestamp: number;
   version: string;
@@ -31,81 +38,251 @@ interface CachedDATData {
 const CACHE_EXPIRY_HOURS = 24; // Cache DATs for 24 hours
 const CACHE_VERSION = "1.0"; // Increment to invalidate old caches
 
+const DB_NAME = "rom-validate-web";
+const DB_VERSION = 1;
+const STORE_NAME = "dat-cache";
+const LEGACY_CACHE_PREFIX = "dat-cache-";
+
+let dbPromise: Promise<IDBDatabase | null> | null = null;
+
 // Get cache key for platform
-function getCacheKey(
-  platform: string,
-  source: "bundled" | "libretro" | "custom",
-): string {
+function getCacheKey(platform: string, source: DATSource): string {
   return `dat-cache-${source}-${platform}`;
 }
 
-// Load from persistent cache
-function loadFromPersistentCache(
-  platform: string,
-  source: "bundled" | "libretro" | "custom",
-): DATEntry[] | null {
+function openCacheDB(): Promise<IDBDatabase | null> {
+  if (typeof indexedDB === "undefined") return Promise.resolve(null);
+  if (dbPromise) return dbPromise;
+
+  const opening = new Promise<IDBDatabase | null>((resolve) => {
+    let request: IDBOpenDBRequest;
+    let settled = false;
+
+    try {
+      request = indexedDB.open(DB_NAME, DB_VERSION);
+    } catch (error) {
+      console.warn("Failed to open DAT cache database:", error);
+      settled = true;
+      resolve(null);
+      return;
+    }
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: "key" });
+      }
+    };
+    request.onsuccess = () => {
+      const db = request.result;
+      if (settled) {
+        // A blocked open eventually succeeded; keep this session memory-only.
+        db.close();
+        return;
+      }
+      settled = true;
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      resolve(db);
+    };
+    request.onerror = () => {
+      console.warn("Failed to open DAT cache database:", request.error);
+      if (settled) return;
+      settled = true;
+      resolve(null);
+    };
+    request.onblocked = () => {
+      console.warn(
+        "DAT cache database upgrade is blocked by another tab; using memory cache only",
+      );
+      if (settled) return;
+      settled = true;
+      resolve(null);
+    };
+  });
+
+  dbPromise = opening;
+  // Allow a later call to retry after a failed or blocked open.
+  void opening.then((db) => {
+    if (!db && dbPromise === opening) dbPromise = null;
+  });
+  return opening;
+}
+
+// Run one object-store operation and wait for the transaction to complete.
+// Returns null when IndexedDB is unavailable or the operation fails.
+async function withStore<T>(
+  mode: IDBTransactionMode,
+  operation: (store: IDBObjectStore) => IDBRequest<T>,
+): Promise<T | null> {
+  const db = await openCacheDB();
+  if (!db) return null;
+
   try {
-    const cacheKey = getCacheKey(platform, source);
-    const cached = localStorage.getItem(cacheKey);
-    if (!cached) return null;
+    return await new Promise<T>((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, mode);
+      const request = operation(transaction.objectStore(STORE_NAME));
+      let result: T;
 
-    const data: CachedDATData = JSON.parse(cached);
+      request.onsuccess = () => {
+        result = request.result;
+      };
+      request.onerror = () => {
+        reject(request.error ?? new Error("IndexedDB request failed"));
+      };
+      transaction.oncomplete = () => resolve(result);
+      transaction.onerror = () => {
+        reject(transaction.error ?? new Error("IndexedDB transaction failed"));
+      };
+      transaction.onabort = () => {
+        reject(transaction.error ?? new Error("IndexedDB transaction aborted"));
+      };
+    });
+  } catch (error) {
+    console.warn("DAT cache operation failed:", error);
+    return null;
+  }
+}
 
-    // Check version and expiry
-    const now = Date.now();
-    const hoursSinceCache = (now - data.timestamp) / (1000 * 60 * 60);
+function isCacheValid(data: CachedDATData, now = Date.now()): boolean {
+  const hoursSinceCache = (now - data.timestamp) / (1000 * 60 * 60);
+  return (
+    data.version === CACHE_VERSION &&
+    hoursSinceCache >= 0 &&
+    hoursSinceCache <= CACHE_EXPIRY_HOURS
+  );
+}
 
+async function getCachedRecord(
+  cacheKey: string,
+): Promise<CachedDATData | undefined> {
+  const record = await withStore<CachedDATData | undefined>(
+    "readonly",
+    (store) => store.get(cacheKey),
+  );
+  return record ?? undefined;
+}
+
+async function putCachedRecord(data: CachedDATData): Promise<boolean> {
+  const result = await withStore<IDBValidKey>("readwrite", (store) =>
+    store.put(data),
+  );
+  return result !== null;
+}
+
+async function deleteCachedRecord(cacheKey: string): Promise<void> {
+  await withStore<undefined>("readwrite", (store) => store.delete(cacheKey));
+}
+
+// Move a legacy localStorage entry into IndexedDB. The legacy key is removed
+// only after the write succeeds, so a failed migration can be retried.
+async function migrateLegacyCache(
+  platform: string,
+  source: DATSource,
+): Promise<DATEntry[] | null> {
+  if (typeof localStorage === "undefined") return null;
+
+  const cacheKey = getCacheKey(platform, source);
+  try {
+    const raw = localStorage.getItem(cacheKey);
+    if (!raw) return null;
+
+    const legacy = JSON.parse(raw) as Partial<CachedDATData>;
+    const entries = legacy.entries;
     if (
-      data.version !== CACHE_VERSION ||
-      hoursSinceCache > CACHE_EXPIRY_HOURS
+      !Array.isArray(entries) ||
+      typeof legacy.timestamp !== "number" ||
+      legacy.version !== CACHE_VERSION
     ) {
       localStorage.removeItem(cacheKey);
       return null;
     }
 
-    return data.entries;
+    const migrated: CachedDATData = {
+      key: cacheKey,
+      platform,
+      source,
+      entries,
+      timestamp: legacy.timestamp,
+      version: legacy.version,
+    };
+
+    if (isCacheValid(migrated)) {
+      if (await putCachedRecord(migrated)) {
+        localStorage.removeItem(cacheKey);
+      }
+      return entries;
+    }
+
+    localStorage.removeItem(cacheKey);
+    return null;
   } catch (error) {
-    console.warn("Failed to load from persistent cache:", error);
+    console.warn("Failed to migrate legacy DAT cache:", error);
     return null;
   }
 }
 
-// Save to persistent cache
-// Silently skips if localStorage quota would be exceeded
-function saveToPersistentCache(
-  platform: string,
-  source: "bundled" | "libretro" | "custom",
-  entries: DATEntry[],
-): void {
+// Move every legacy localStorage entry into IndexedDB. Runs before cache
+// listings so an upgrade does not appear to lose the existing cache.
+async function migrateAllLegacyCaches(): Promise<void> {
+  if (typeof localStorage === "undefined") return;
+
   try {
-    const cacheKey = getCacheKey(platform, source);
-    const data: CachedDATData = {
-      entries,
-      timestamp: Date.now(),
-      version: CACHE_VERSION,
-    };
-    const serialized = JSON.stringify(data);
-
-    // Check approximate size before attempting to save
-    // localStorage typically has a 5-10MB limit; skip if entry is too large
-    const sizeKB = serialized.length / 1024;
-    if (sizeKB > 2048) {
-      // Skip caching entries larger than ~2MB to avoid quota issues
-      // The in-memory cache (datCache) still works for this session
-      return;
+    const keys = Object.keys(localStorage).filter((key) =>
+      key.startsWith(LEGACY_CACHE_PREFIX),
+    );
+    for (const key of keys) {
+      const [source, ...platformParts] = key
+        .slice(LEGACY_CACHE_PREFIX.length)
+        .split("-");
+      if (
+        source !== "bundled" &&
+        source !== "libretro" &&
+        source !== "custom"
+      ) {
+        localStorage.removeItem(key);
+        continue;
+      }
+      await migrateLegacyCache(platformParts.join("-"), source);
     }
-
-    // Try to save, catch quota exceeded errors
-    localStorage.setItem(cacheKey, serialized);
   } catch (error) {
-    // Silently ignore quota exceeded or other storage errors
-    // The in-memory cache (datCache) still works for this session
-    if (error instanceof DOMException) {
-      // QuotaExceededError - expected for large DAT sets, not a problem
-      return;
-    }
-    console.warn("Failed to save to persistent cache:", error);
+    console.warn("Failed to migrate legacy DAT caches:", error);
   }
+}
+
+// Load from persistent cache
+async function loadFromPersistentCache(
+  platform: string,
+  source: DATSource,
+): Promise<DATEntry[] | null> {
+  const cacheKey = getCacheKey(platform, source);
+  const cached = await getCachedRecord(cacheKey);
+
+  if (cached) {
+    if (isCacheValid(cached)) return cached.entries;
+    await deleteCachedRecord(cacheKey);
+  }
+
+  return migrateLegacyCache(platform, source);
+}
+
+// Save to persistent cache
+async function saveToPersistentCache(
+  platform: string,
+  source: DATSource,
+  entries: DATEntry[],
+): Promise<void> {
+  const cacheKey = getCacheKey(platform, source);
+  await putCachedRecord({
+    key: cacheKey,
+    platform,
+    source,
+    entries,
+    timestamp: Date.now(),
+    version: CACHE_VERSION,
+  });
 }
 
 // Get platform(s) from file extension
@@ -139,9 +316,9 @@ export async function loadBundledDAT(platform: string): Promise<DATEntry[]> {
   }
 
   // Check persistent cache
-  const cachedEntries = loadFromPersistentCache(platform, "bundled");
+  const cachedEntries = await loadFromPersistentCache(platform, "bundled");
   if (cachedEntries) {
-    console.log(`📦 Using cached bundled DAT for ${platform} (localStorage)`);
+    console.log(`📦 Using cached bundled DAT for ${platform} (IndexedDB)`);
     datCache.set(memoryKey, cachedEntries);
     return cachedEntries;
   }
@@ -163,7 +340,7 @@ export async function loadBundledDAT(platform: string): Promise<DATEntry[]> {
 
     // Cache in both memory and persistent storage
     datCache.set(memoryKey, entries);
-    saveToPersistentCache(platform, "bundled", entries);
+    await saveToPersistentCache(platform, "bundled", entries);
 
     return entries;
   } catch (error) {
@@ -215,9 +392,9 @@ export async function loadLibretroDAT(platform: string): Promise<DATEntry[]> {
   }
 
   // Check persistent cache
-  const cachedEntries = loadFromPersistentCache(platform, "libretro");
+  const cachedEntries = await loadFromPersistentCache(platform, "libretro");
   if (cachedEntries) {
-    console.log(`🌐 Using cached Libretro DAT for ${platform} (localStorage)`);
+    console.log(`🌐 Using cached Libretro DAT for ${platform} (IndexedDB)`);
     datCache.set(memoryKey, cachedEntries);
     return cachedEntries;
   }
@@ -250,7 +427,7 @@ export async function loadLibretroDAT(platform: string): Promise<DATEntry[]> {
 
     // Cache in both memory and persistent storage
     datCache.set(memoryKey, entries);
-    saveToPersistentCache(platform, "libretro", entries);
+    await saveToPersistentCache(platform, "libretro", entries);
 
     return entries;
   } catch (error) {
@@ -296,37 +473,55 @@ async function loadPlatformDATUncached(platform: string): Promise<DATEntry[]> {
   return await loadLibretroDAT(platform);
 }
 
+// Run async jobs with a bounded number in flight. Results keep input order.
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  if (limit <= 0) {
+    throw new RangeError("Concurrency limit must be greater than zero");
+  }
+
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+
+  const run = async () => {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= items.length) return;
+      results[index] = await worker(items[index]);
+    }
+  };
+
+  const runners = Array.from({ length: Math.min(limit, items.length) }, () =>
+    run(),
+  );
+  await Promise.all(runners);
+  return results;
+}
+
 // Load DATs for multiple platforms
 export async function loadMultiplePlatformDATs(
   platforms: string[],
 ): Promise<DATEntry[]> {
-  const allEntries: DATEntry[] = [];
-
-  for (const platform of platforms) {
-    const entries = await loadPlatformDAT(platform);
-    allEntries.push(...entries);
-  }
-
-  return allEntries;
+  const groups = await mapWithConcurrency(platforms, 4, loadPlatformDAT);
+  return groups.flat();
 }
 
 // Load all available DATs (both bundled and Libretro)
 export async function loadAllBundledDATs(): Promise<DATEntry[]> {
-  const allEntries: DATEntry[] = [];
+  const jobs = [
+    ...Object.keys(BUNDLED_DATS).map(
+      (platform) => () => loadBundledDAT(platform),
+    ),
+    ...Object.keys(PLATFORMS).map(
+      (platform) => () => loadLibretroDAT(platform),
+    ),
+  ];
 
-  // Load all bundled DATs
-  for (const platform of Object.keys(BUNDLED_DATS)) {
-    const entries = await loadBundledDAT(platform);
-    allEntries.push(...entries);
-  }
-
-  // Load all Libretro DATs
-  for (const platform of Object.keys(PLATFORMS)) {
-    const entries = await loadLibretroDAT(platform);
-    allEntries.push(...entries);
-  }
-
-  return allEntries;
+  const groups = await mapWithConcurrency(jobs, 4, (job) => job());
+  return groups.flat();
 }
 
 // Get supported platforms (excludes bundled encrypted versions that are fallbacks)
@@ -337,64 +532,37 @@ export function getSupportedPlatforms(): string[] {
 }
 
 // Clear all caches (useful for debugging or force refresh)
-export function clearDATCache(): void {
+export async function clearDATCache(): Promise<void> {
   // Clear memory cache
   datCache.clear();
+  inFlightPlatformDATs.clear();
 
-  // Clear persistent cache
+  // Clear IndexedDB and any legacy localStorage entries
+  await withStore<undefined>("readwrite", (store) => store.clear());
+  clearLegacyCacheKeys();
+  console.log("🧹 DAT caches cleared");
+}
+
+function clearLegacyCacheKeys(): void {
   try {
+    if (typeof localStorage === "undefined") return;
     const keys = Object.keys(localStorage);
     for (const key of keys) {
-      if (key.startsWith("dat-cache-")) {
+      if (key.startsWith(LEGACY_CACHE_PREFIX)) {
         localStorage.removeItem(key);
       }
     }
-    console.log("🧹 DAT caches cleared");
   } catch (error) {
-    console.warn("Failed to clear persistent cache:", error);
+    console.warn("Failed to clear legacy DAT cache:", error);
   }
 }
 
-interface ScannedCachedDAT {
-  key: string;
-  source: string;
-  platform: string;
-  timestamp: number;
-  version: string;
-  entries: DATEntry[];
-  jsonString: string;
-}
-
-function scanCachedDATs(): ScannedCachedDAT[] {
-  const results: ScannedCachedDAT[] = [];
-  try {
-    const keys = Object.keys(localStorage);
-    for (const key of keys) {
-      if (!key.startsWith("dat-cache-")) continue;
-      const jsonString = localStorage.getItem(key);
-      if (!jsonString) continue;
-      try {
-        const cachedData: CachedDATData = JSON.parse(jsonString);
-        const keyParts = key.replace("dat-cache-", "").split("-");
-        const source = keyParts[0];
-        const platform = keyParts.slice(1).join("-");
-        results.push({
-          key,
-          source,
-          platform,
-          timestamp: cachedData.timestamp,
-          version: cachedData.version,
-          entries: cachedData.entries,
-          jsonString,
-        });
-      } catch (parseError) {
-        console.warn("Failed to parse cached DAT:", key, parseError);
-      }
-    }
-  } catch (error) {
-    console.warn("Failed to scan cached DATs:", error);
-  }
-  return results;
+async function scanCachedDATs(): Promise<CachedDATData[]> {
+  await migrateAllLegacyCaches();
+  const records = await withStore<CachedDATData[]>("readonly", (store) =>
+    store.getAll(),
+  );
+  return records ?? [];
 }
 
 // Get cache status for debugging
@@ -410,15 +578,11 @@ export async function getCacheStatus(): Promise<{
   let persistentCount = 0;
   let totalSize = 0;
 
-  const scanned = scanCachedDATs();
+  const scanned = await scanCachedDATs();
   for (const item of scanned) {
     if (item.source !== "bundled") {
       persistentCount++;
-      if (item.entries) {
-        totalSize += JSON.stringify(item.entries).length;
-      } else {
-        totalSize += item.jsonString.length;
-      }
+      totalSize += JSON.stringify(item.entries).length;
     }
   }
 
@@ -444,14 +608,10 @@ export async function getCachedDATs(): Promise<
     entryCount: number;
   }> = [];
 
-  const scanned = scanCachedDATs();
-  const now = Date.now();
+  const scanned = await scanCachedDATs();
   for (const item of scanned) {
     if (item.source === "bundled") continue;
-    const isExpired =
-      now - item.timestamp > CACHE_EXPIRY_HOURS * 60 * 60 * 1000;
-    const isValidVersion = item.version === CACHE_VERSION;
-    if (!isExpired && isValidVersion && item.entries) {
+    if (isCacheValid(item)) {
       cachedDATs.push({
         platform: item.platform,
         source: item.source,
@@ -470,7 +630,7 @@ export async function getCachedDATs(): Promise<
         ? "Nintendo DS (Encrypted)"
         : platform;
 
-    // Show bundled DATs if in memory or localStorage
+    // Show bundled DATs if in memory or the persistent cache
     if (datCache.has(memoryKey)) {
       const entries = datCache.get(memoryKey)!;
       cachedDATs.push({
@@ -479,7 +639,7 @@ export async function getCachedDATs(): Promise<
         entryCount: entries.length,
       });
     } else {
-      const cachedData = loadFromPersistentCache(platform, "bundled");
+      const cachedData = await loadFromPersistentCache(platform, "bundled");
       if (cachedData) {
         cachedDATs.push({
           platform: displayName,
@@ -516,10 +676,6 @@ export async function browseCachedDAT(
   }
 
   // For other sources (libretro, custom), check persistent cache
-  const cacheKey = getCacheKey(
-    platform,
-    source as "bundled" | "libretro" | "custom",
-  );
   return loadFromPersistentCache(
     platform,
     source as "bundled" | "libretro" | "custom",
@@ -552,7 +708,7 @@ export async function uploadCustomDAT(file: File): Promise<{
     // Cache the custom DAT
     const memoryKey = `custom-${platform}`;
     datCache.set(memoryKey, entries);
-    saveToPersistentCache(platform, "custom", entries);
+    await saveToPersistentCache(platform, "custom", entries);
 
     console.log(
       `📁 Uploaded custom DAT: ${platform} with ${entries.length} entries`,
@@ -613,31 +769,10 @@ export async function getRawDATContent(
       }
     }
 
-    // For other sources (libretro, custom), check localStorage cache
-    // Also handle bundled DATs that might be cached with original name
-    let actualPlatformForCache = platform;
-    if (source === "bundled" && platform === "Nintendo DS (Encrypted)") {
-      actualPlatformForCache = "Nintendo DS Encrypted (Bundled)";
-    }
-
-    const cacheKey = getCacheKey(
-      actualPlatformForCache,
-      source as "bundled" | "libretro" | "custom",
-    );
-    const cached = localStorage.getItem(cacheKey);
-    if (!cached) return null;
-
-    const data: CachedDATData = JSON.parse(cached);
-
-    // Check if cache is still valid
-    const now = Date.now();
-    const isExpired =
-      now - data.timestamp > CACHE_EXPIRY_HOURS * 60 * 60 * 1000;
-    const isValidVersion = data.version === CACHE_VERSION;
-
-    if (isExpired || !isValidVersion) {
-      return null;
-    }
+    // For other sources (libretro, custom), check the persistent cache
+    const cacheKey = getCacheKey(platform, source as DATSource);
+    const data = await getCachedRecord(cacheKey);
+    if (!data || !isCacheValid(data)) return null;
 
     // Convert entries back to a readable format
     const header =
